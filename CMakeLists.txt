@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_library(psforcer_cekirdegi
-    src/Json.cpp
+    src/JsonTurkce.cpp
     src/Catalog.cpp
     src/Sha256.cpp
     src/FileUtil.cpp
