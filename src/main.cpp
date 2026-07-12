@@ -8,24 +8,20 @@ int main(int argc, char** argv) {
     (void)argc;
     (void)argv;
 
-    psforcer::bootLog("main entered");
+    psforcer::bootLog("Ana işlem başladı");
     psforcer::App app;
-    psforcer::bootLog("App constructed");
+    psforcer::bootLog("Uygulama oluşturuldu");
 
     std::string error;
     if (!app.initialize(error)) {
-        const std::string message = std::string("initialization failed: ") + error;
+        const std::string message = std::string("Başlatma başarısız: ") + error;
         psforcer::bootLog(message.c_str());
-        std::printf("PSForcer initialization failed: %s\n", error.c_str());
-
-        // Returning a non-zero code is surfaced by the PS4 shell as CE-34878-0.
-        // Preserve the diagnostic log but exit cleanly so initialization errors do
-        // not look like an application crash.
+        std::printf("PSForcer başlatılamadı: %s\n", error.c_str());
         return 0;
     }
 
-    psforcer::bootLog("initialization completed");
+    psforcer::bootLog("Başlatma tamamlandı");
     const int result = app.run();
-    psforcer::bootLog("main loop exited");
+    psforcer::bootLog("Ana döngü kapandı");
     return result;
 }
