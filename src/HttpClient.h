@@ -23,6 +23,7 @@ public:
     bool download(const std::string& url,
                   const std::string& destination,
                   bool resume,
+                  uint64_t expectedSize,
                   const HttpProgressCallback& progress,
                   std::atomic<bool>* cancel,
                   std::string& error);
@@ -32,6 +33,8 @@ private:
     int netPoolId_;
     int sslContextId_;
     int httpContextId_;
+    std::string cachedSourceUrl_;
+    std::string cachedResolvedUrl_;
 #endif
 };
 
