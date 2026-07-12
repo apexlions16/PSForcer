@@ -29,16 +29,25 @@ bool isPermanentDownloadError(const std::string& error) {
            message.find("404") != std::string::npos ||
            message.find("hedef dosya") != std::string::npos ||
            message.find("dosyaya yaz") != std::string::npos ||
-           message.find("klasör") != std::string::npos;
+           message.find("klasör") != std::string::npos ||
+           message.find("yanlış aralıktan") != std::string::npos;
 }
 
-void waitBeforeReconnect(unsigned int attempt) {
+uint64_t monotonicMilliseconds() {
 #if defined(PSFORCER_ORBIS)
-    const unsigned int milliseconds = std::min(4000u, 500u + attempt * 250u);
+    return static_cast<uint64_t>(SDL_GetTicks());
+#else
+    return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count());
+#endif
+}
+
+void waitBeforeReconnect(unsigned int failureCount) {
+#if defined(PSFORCER_ORBIS)
+    const unsigned int milliseconds = std::min(3000u, 250u + failureCount * 350u);
     SDL_Delay(milliseconds);
 #else
-    // Bilgisayar sınamalarında gerçek ağ beklemesi yok; sınamayı gereksiz uzatma.
-    (void)attempt;
+    (void)failureCount;
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
 #endif
 }
@@ -93,6 +102,7 @@ bool DownloadManager::start(const DownloadRequest& request, std::string& error) 
         snapshot_.destination = request.destination;
         snapshot_.downloaded = request.resume ? fileSize(request.destination) : 0;
         snapshot_.total = request.expectedSize;
+        snapshot_.status = "İNDİRME HAZIRLANIYOR";
 #if defined(PSFORCER_ORBIS)
         pendingRequest_ = request;
 #endif
@@ -105,6 +115,7 @@ bool DownloadManager::start(const DownloadRequest& request, std::string& error) 
         std::lock_guard<std::mutex> lock(mutex_);
         snapshot_.state = DownloadState::Failed;
         snapshot_.error = error;
+        snapshot_.status.clear();
         return false;
     }
 #else
@@ -154,31 +165,45 @@ void DownloadManager::run(DownloadRequest request) {
     std::string error;
     std::string lastError;
     uint64_t previousSize = request.resume ? fileSize(request.destination) : 0;
+    const uint64_t sessionStartSize = previousSize;
+    const uint64_t sessionStartTime = monotonicMilliseconds();
     unsigned int reconnectCount = 0;
     unsigned int noProgressCount = 0;
+    bool firstAttempt = true;
     bool complete = false;
 
-    // Büyük Hugging Face dosyalarında CDN bağlantısı bazen dosyanın tamamı gelmeden
-    // normal EOF döndürüyor. Boyut tamamlanana kadar Range ile aynı .parca dosyasını
-    // otomatik sürdür; kullanıcının Kare'ye tekrar tekrar basması gerekmesin.
+    // Hugging Face/Xet büyük dosyayı birden fazla HTTP aralığı halinde verebilir.
+    // Veri ilerlediyse bu bir hata değildir: gecikmeden sonraki aralığa geçilir.
     while (!cancelRequested_.load()) {
         error.clear();
         const bool requestFinished = client_.download(
             request.url,
             request.destination,
-            true,
-            [this, request](const HttpProgress& progress) {
+            firstAttempt ? request.resume : true,
+            request.expectedSize,
+            [this, request, sessionStartSize, sessionStartTime](const HttpProgress& progress) {
+                const uint64_t now = monotonicMilliseconds();
+                const uint64_t elapsed = now >= sessionStartTime ? now - sessionStartTime : 0;
+                const uint64_t sessionBytes = progress.downloaded >= sessionStartSize
+                    ? progress.downloaded - sessionStartSize
+                    : 0;
+
                 std::lock_guard<std::mutex> lock(mutex_);
                 snapshot_.downloaded = progress.downloaded;
                 snapshot_.total = request.expectedSize > 0
                     ? request.expectedSize
                     : progress.total;
+                if (elapsed >= 250)
+                    snapshot_.bytesPerSecond = sessionBytes * 1000ULL / elapsed;
+                snapshot_.status.clear();
                 snapshot_.error.clear();
             },
             &cancelRequested_,
             error);
+        firstAttempt = false;
 
         const uint64_t actualSize = fileSize(request.destination);
+        const bool madeProgress = actualSize > previousSize;
         {
             std::lock_guard<std::mutex> lock(mutex_);
             snapshot_.downloaded = actualSize;
@@ -205,19 +230,27 @@ void DownloadManager::run(DownloadRequest request) {
             break;
         }
 
+        if (madeProgress) {
+            previousSize = actualSize;
+            noProgressCount = 0;
+            ++reconnectCount;
+            {
+                std::lock_guard<std::mutex> lock(mutex_);
+                snapshot_.reconnects = reconnectCount;
+                snapshot_.status.clear();
+            }
+            // Sağlıklı parça tamamlandı. Eski sürüm burada her defasında 0,5–4 sn
+            // beklediği için yüzlerce aralıkta indirme yapay biçimde yavaşlıyordu.
+            continue;
+        }
+
         if (!requestFinished && isPermanentDownloadError(error)) {
             lastError = error;
             break;
         }
 
-        if (actualSize > previousSize) {
-            previousSize = actualSize;
-            noProgressCount = 0;
-        } else {
-            ++noProgressCount;
-        }
+        ++noProgressCount;
         ++reconnectCount;
-
         if (!error.empty()) lastError = error;
 
         if (noProgressCount >= 5) {
@@ -235,16 +268,17 @@ void DownloadManager::run(DownloadRequest request) {
 
         {
             std::lock_guard<std::mutex> lock(mutex_);
-            std::ostringstream message;
-            message << "Bağlantı yenileniyor; " << actualSize << " bayt alındı";
-            snapshot_.error = message.str();
+            snapshot_.reconnects = reconnectCount;
+            snapshot_.status = "BAĞLANTI TEKRAR KURULUYOR";
+            snapshot_.error.clear();
         }
-        waitBeforeReconnect(reconnectCount);
+        waitBeforeReconnect(noProgressCount);
     }
 
     if (cancelRequested_.load()) {
         std::lock_guard<std::mutex> lock(mutex_);
         snapshot_.state = DownloadState::Cancelled;
+        snapshot_.status.clear();
         snapshot_.error = "İndirme iptal edildi";
         return;
     }
@@ -253,6 +287,7 @@ void DownloadManager::run(DownloadRequest request) {
         if (lastError.empty()) lastError = error.empty() ? "İndirme tamamlanamadı" : error;
         std::lock_guard<std::mutex> lock(mutex_);
         snapshot_.state = DownloadState::Failed;
+        snapshot_.status.clear();
         snapshot_.error = lastError;
         return;
     }
@@ -268,6 +303,7 @@ void DownloadManager::run(DownloadRequest request) {
             snapshot_.downloaded = actualSize;
             snapshot_.total = request.expectedSize;
             snapshot_.state = DownloadState::Failed;
+            snapshot_.status.clear();
             snapshot_.error = message.str();
             return;
         }
@@ -277,18 +313,21 @@ void DownloadManager::run(DownloadRequest request) {
         {
             std::lock_guard<std::mutex> lock(mutex_);
             snapshot_.state = DownloadState::Verifying;
+            snapshot_.status = "BÜTÜNLÜK DENETLENİYOR";
             snapshot_.error.clear();
         }
         std::string digest;
         if (!Sha256::fileHex(request.destination, digest, error)) {
             std::lock_guard<std::mutex> lock(mutex_);
             snapshot_.state = DownloadState::Failed;
+            snapshot_.status.clear();
             snapshot_.error = error;
             return;
         }
         if (lower(digest) != lower(request.sha256)) {
             std::lock_guard<std::mutex> lock(mutex_);
             snapshot_.state = DownloadState::Failed;
+            snapshot_.status.clear();
             snapshot_.error = "SHA-256 bütünlük denetimi başarısız";
             return;
         }
@@ -298,6 +337,7 @@ void DownloadManager::run(DownloadRequest request) {
     snapshot_.downloaded = fileSize(request.destination);
     if (snapshot_.total == 0) snapshot_.total = snapshot_.downloaded;
     snapshot_.state = DownloadState::Completed;
+    snapshot_.status.clear();
     snapshot_.error.clear();
 }
 

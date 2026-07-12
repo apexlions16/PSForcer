@@ -37,8 +37,13 @@ struct DownloadSnapshot {
     std::string destination;
     uint64_t downloaded;
     uint64_t total;
+    uint64_t bytesPerSecond;
+    unsigned int reconnects;
+    std::string status;
     std::string error;
-    DownloadSnapshot() : jobId(0), state(DownloadState::Idle), downloaded(0), total(0) {}
+    DownloadSnapshot()
+        : jobId(0), state(DownloadState::Idle), downloaded(0), total(0),
+          bytesPerSecond(0), reconnects(0) {}
 };
 
 class DownloadManager {
