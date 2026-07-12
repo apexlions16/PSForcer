@@ -12,7 +12,7 @@ inline void bootLog(const char* message) {
     if (!message) return;
 #if defined(PSFORCER_ORBIS)
     sceKernelDebugOutText(0, "[PSForcer] %s\n", message);
-    FILE* file = std::fopen("/data/psforcer-startup.log", "a");
+    FILE* file = std::fopen("/data/psforcer-baslangic.log", "a");
     if (file) {
         std::fprintf(file, "%s\n", message);
         std::fclose(file);
