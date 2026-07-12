@@ -95,20 +95,30 @@ jobs:
         run: make bootstrap
 
       - name: Build PS4 PKG
+        shell: bash
         run: |
+          set +e
           make clean
-          make -j2
+          make -j2 2>&1 | tee openorbis-build.log
+          build_status=${PIPESTATUS[0]}
+          echo '--- final build log ---'
+          tail -n 160 openorbis-build.log || true
+          if [ "$build_status" -ne 0 ]; then
+            exit "$build_status"
+          fi
           test -s "$PKG_NAME"
           sha256sum "$PKG_NAME" | tee "$PKG_NAME.sha256"
 
-      - name: Upload workflow artifact
+      - name: Upload build diagnostics
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: PSForcer-v0.1.0-PKG
+          name: PSForcer-openorbis-build
           path: |
+            openorbis-build.log
             ${{ env.PKG_NAME }}
             ${{ env.PKG_NAME }}.sha256
-          if-no-files-found: error
+          if-no-files-found: warn
 
       - name: Publish GitHub Release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
