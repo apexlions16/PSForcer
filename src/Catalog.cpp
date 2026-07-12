@@ -60,17 +60,17 @@ Color parseColor(std::string value) {
 bool validateRequiredString(const JsonValue& object, const char* key, const std::string& context, std::string& error) {
     const JsonValue* value = object.get(key);
     if (!value || !value->isString() || value->stringValue().empty()) {
-        error = context + " requires non-empty string '" + key + "'";
+        error = context + " içinde '" + key + "' alanı boş olmayan bir metin olmalıdır";
         return false;
     }
     return true;
 }
-}  // namespace
+}
 
 bool CatalogLoader::loadFile(const std::string& path, CatalogData& catalog, std::string& error) {
     const std::string json = readTextFile(path);
     if (json.empty()) {
-        error = "Catalog file is missing or empty: " + path;
+        error = "Katalog dosyası bulunamadı veya boş: " + path;
         return false;
     }
     return parse(json, catalog, error);
@@ -81,7 +81,7 @@ bool CatalogLoader::parse(const std::string& json, CatalogData& catalog, std::st
     JsonParser parser;
     if (!parser.parse(json, root, error)) return false;
     if (!root.isObject()) {
-        error = "Catalog root must be an object";
+        error = "Katalog kökü bir nesne olmalıdır";
         return false;
     }
     CatalogData parsed;
@@ -89,21 +89,21 @@ bool CatalogLoader::parse(const std::string& json, CatalogData& catalog, std::st
     parsed.catalogTitle = getString(root, "catalogTitle", "PSForcer");
     parsed.updatedAt = getString(root, "updatedAt");
     if (parsed.schemaVersion != 1) {
-        error = "Unsupported schemaVersion; expected 1";
+        error = "Desteklenmeyen şema sürümü; beklenen değer 1";
         return false;
     }
     const JsonValue* items = root.get("items");
     if (!items || !items->isArray()) {
-        error = "Catalog requires an items array";
+        error = "Katalogda içerik dizisi bulunmalıdır";
         return false;
     }
     const std::vector<JsonValue>& itemValues = items->arrayValue();
     for (size_t itemIndex = 0; itemIndex < itemValues.size(); ++itemIndex) {
         const JsonValue& source = itemValues[itemIndex];
         std::ostringstream context;
-        context << "items[" << itemIndex << "]";
+        context << "içerikler[" << itemIndex << "]";
         if (!source.isObject()) {
-            error = context.str() + " must be an object";
+            error = context.str() + " bir nesne olmalıdır";
             return false;
         }
         if (!validateRequiredString(source, "id", context.str(), error) ||
@@ -111,8 +111,8 @@ bool CatalogLoader::parse(const std::string& json, CatalogData& catalog, std::st
         CatalogItem item;
         item.id = getString(source, "id");
         item.title = getString(source, "title");
-        item.developer = getString(source, "developer", "Unknown studio");
-        item.genre = getString(source, "genre", "Other");
+        item.developer = getString(source, "developer", "Bilinmeyen stüdyo");
+        item.genre = getString(source, "genre", "Diğer");
         item.description = getString(source, "description");
         item.releaseYear = getInt(source, "releaseYear", 0);
         item.accent = parseColor(getString(source, "accent", "6C63FF"));
@@ -131,16 +131,16 @@ bool CatalogLoader::parse(const std::string& json, CatalogData& catalog, std::st
         }
         const JsonValue* packages = source.get("packages");
         if (!packages || !packages->isArray()) {
-            error = context.str() + " requires a packages array";
+            error = context.str() + " içinde paket dizisi bulunmalıdır";
             return false;
         }
         const std::vector<JsonValue>& packageValues = packages->arrayValue();
         for (size_t packageIndex = 0; packageIndex < packageValues.size(); ++packageIndex) {
             const JsonValue& packageSource = packageValues[packageIndex];
             std::ostringstream packageContext;
-            packageContext << context.str() << ".packages[" << packageIndex << "]";
+            packageContext << context.str() << ".paketler[" << packageIndex << "]";
             if (!packageSource.isObject()) {
-                error = packageContext.str() + " must be an object";
+                error = packageContext.str() + " bir nesne olmalıdır";
                 return false;
             }
             if (!validateRequiredString(packageSource, "id", packageContext.str(), error) ||
@@ -150,7 +150,7 @@ bool CatalogLoader::parse(const std::string& json, CatalogData& catalog, std::st
             package.id = getString(packageSource, "id");
             package.kind = parseKind(getString(packageSource, "kind"));
             if (package.kind == PackageKind::Unknown) {
-                error = packageContext.str() + " has invalid package kind";
+                error = packageContext.str() + " içinde geçersiz paket türü var";
                 return false;
             }
             package.label = getString(packageSource, "label");
@@ -178,15 +178,15 @@ bool CatalogLoader::itemContainsKind(const CatalogItem& item, PackageKind kind) 
 PackageKind CatalogLoader::parseKind(const std::string& value) {
     std::string normalized = value;
     std::transform(normalized.begin(), normalized.end(), normalized.begin(), static_cast<int(*)(int)>(std::tolower));
-    if (normalized == "game" || normalized == "base") return PackageKind::Game;
-    if (normalized == "update" || normalized == "patch") return PackageKind::Update;
-    if (normalized == "dlc") return PackageKind::Dlc;
-    if (normalized == "extra" || normalized == "bonus") return PackageKind::Extra;
+    if (normalized == "game" || normalized == "base" || normalized == "oyun" || normalized == "ana-oyun") return PackageKind::Game;
+    if (normalized == "update" || normalized == "patch" || normalized == "guncelleme") return PackageKind::Update;
+    if (normalized == "dlc" || normalized == "ek-paket") return PackageKind::Dlc;
+    if (normalized == "extra" || normalized == "bonus" || normalized == "ekstra") return PackageKind::Extra;
     return PackageKind::Unknown;
 }
 
 std::string CatalogLoader::formatBytes(uint64_t bytes) {
-    static const char* units[] = {"B", "KB", "MB", "GB", "TB"};
+    static const char* units[] = {"bayt", "KB", "MB", "GB", "TB"};
     double value = static_cast<double>(bytes);
     size_t unit = 0;
     while (value >= 1024.0 && unit < 4) {
