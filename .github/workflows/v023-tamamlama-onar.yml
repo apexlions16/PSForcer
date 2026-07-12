@@ -5,17 +5,22 @@ on:
     branches: [duzeltme/tamamlama-v023]
     paths:
       - '.github/workflows/v023-tamamlama-onar.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/v023-tamamlama-onar.yml'
 
 permissions:
   contents: write
 
 jobs:
   onar:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: duzeltme/tamamlama-v023
+          ref: ${{ github.head_ref || github.ref_name }}
           fetch-depth: 0
 
       - name: Tamamlanan yanıtı EOF beklemeden kapat
@@ -160,4 +165,4 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
           git commit -m 'Tam boyutta sunucu kapanışını beklemeden indirimi bitir'
-          git push origin HEAD:duzeltme/tamamlama-v023
+          git push origin HEAD:${{ github.head_ref || github.ref_name }}
