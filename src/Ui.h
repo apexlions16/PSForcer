@@ -26,6 +26,9 @@ public:
     void drawDetail(const CatalogItem& item,
                     size_t selectedPackage,
                     const std::string& status);
+    void drawDetailV016(const CatalogItem& item,
+                        size_t selectedPackage,
+                        const std::string& status);
     void drawDownload(const DownloadSnapshot& snapshot);
     void drawToast(const std::string& message);
 private:

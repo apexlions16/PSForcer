@@ -30,8 +30,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  YAYIN_ETIKETI: v0.1.5
-  ESKI_YAYIN_ETIKETI: v0.1.4
+  YAYIN_ETIKETI: v0.1.6
+  ESKI_YAYIN_ETIKETI: v0.1.5
   PAKET_ADI: IV0000-PSFC00001_00-PSFORCERCLIENT00.pkg
 
 jobs:
@@ -163,8 +163,8 @@ jobs:
           if ! gh release view "$YAYIN_ETIKETI" >/dev/null 2>&1; then
             gh release create "$YAYIN_ETIKETI" \
               --target "$GITHUB_SHA" \
-              --title 'PSForcer v0.1.5 İndirme Kararlılığı ve Uzak Görseller' \
-              --notes 'Kare düğmesine basıldığında oluşan CE-34878-0 hatasına karşı PS4 iş parçacığı ve ağ başlatma düzeni yenilendi. Büyük HTTP tamponu heap alanına taşındı, dosya boyutu doğrulaması eklendi, uzak kapak ve arka plan görselleri geçici önbellekten gösterilmeye başlandı. Katalog artık GitHub üzerinden açılışta yenilenir; katalog değişiklikleri yeni uygulama sürümü oluşturmaz.'
+              --title 'PSForcer v0.1.6 Yetkilendirme ve Büyük Görsel Başlık' \
+              --notes 'Hugging Face HTTP 401 yanıtı için yetkili salt-okunur belirteç desteği ve açıklayıcı hata iletisi eklendi. P.T. kapak, header ve ekran görüntüleri paket içine alındı. Ayrıntı ekranı daha büyük Steam benzeri görsel başlıkla yenilendi. Katalog değişiklikleri tek başına yeni uygulama sürümü oluşturmaz.'
           fi
           gh release upload "$YAYIN_ETIKETI" \
             "$PAKET_ADI" "$PAKET_ADI.sha256" \

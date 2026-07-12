@@ -25,6 +25,14 @@ int gNetPoolId = 0;
 int gSslContextId = 0;
 int gHttpContextId = 0;
 unsigned int gHttpUsers = 0;
+
+bool isHuggingFaceUrl(const std::string& url) {
+    return url.compare(0, 23, "https://huggingface.co/") == 0;
+}
+
+std::string huggingFaceToken() {
+    return trim(readFirstLine("/data/psforcer/hf_token.txt"));
+}
 }
 #endif
 
@@ -134,7 +142,7 @@ bool HttpClient::download(const std::string& url, const std::string& destination
 
     std::vector<uint8_t> buffer(64 * 1024);
 
-    templateId = sceHttpCreateTemplate(httpContextId_, "PSForcer/0.15", ORBIS_HTTP_VERSION_1_1, 1);
+    templateId = sceHttpCreateTemplate(httpContextId_, "PSForcer/0.16", ORBIS_HTTP_VERSION_1_1, 1);
     if (templateId < 0) {
         error = PSF_SABLON;
         return false;
@@ -150,6 +158,15 @@ bool HttpClient::download(const std::string& url, const std::string& destination
     if (requestId < 0) {
         error = PSF_ISTEK;
         goto cleanup;
+    }
+
+    sceHttpAddRequestHeader(requestId, "Accept", "application/octet-stream", 0);
+    if (isHuggingFaceUrl(url)) {
+        const std::string token = huggingFaceToken();
+        if (!token.empty()) {
+            const std::string authorization = "Bearer " + token;
+            sceHttpAddRequestHeader(requestId, "Authorization", authorization.c_str(), 0);
+        }
     }
 
     sceHttpSetResolveTimeOut(requestId, 15 * 1000 * 1000);
@@ -175,9 +192,15 @@ bool HttpClient::download(const std::string& url, const std::string& destination
     }
 
     if (statusCode != 200 && statusCode != 206) {
-        std::ostringstream durum;
-        durum << "İndirme isteği başarısız oldu; durum kodu: " << statusCode;
-        error = durum.str();
+        if (statusCode == 401 && isHuggingFaceUrl(url)) {
+            error = "Hugging Face erişimi reddetti (401): hf_token.txt gerekli veya depo herkese açık olmalı";
+        } else if (statusCode == 403 && isHuggingFaceUrl(url)) {
+            error = "Hugging Face erişimi reddetti (403): belirteç iznini ve depo erişimini denetleyin";
+        } else {
+            std::ostringstream durum;
+            durum << "İndirme isteği başarısız oldu; durum kodu: " << statusCode;
+            error = durum.str();
+        }
         goto cleanup;
     }
 

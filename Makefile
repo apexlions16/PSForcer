@@ -1,6 +1,6 @@
 # PSForcer OpenOrbis paket bilgileri
 TITLE       := PSForcer
-VERSION     := 0.15
+VERSION     := 0.16
 TITLE_ID    := PSFC00001
 CONTENT_ID  := IV0000-PSFC00001_00-PSFORCERCLIENT00
 
@@ -10,7 +10,8 @@ EXTRAFLAGS  := -std=gnu++11 -D_GNU_SOURCE -DPSFORCER_ORBIS=1
 TOOLCHAIN   := $(OO_PS4_TOOLCHAIN)
 PROJDIR     := src
 INTDIR      := x64/Debug
-ASSETS      := $(shell find assets -type f 2>/dev/null)
+MEDIA_FLAT  := assets/pt-cover.jpg assets/pt-header.jpg assets/pt-screenshot-1.jpg assets/pt-screenshot-2.jpg assets/pt-screenshot-3.jpg
+ASSETS      := assets/catalog.json assets/katalog_adresi.txt $(MEDIA_FLAT)
 LIBMODULES  := $(wildcard sce_module/*)
 CPPFILES    := $(shell find $(PROJDIR) -name '*.cpp')
 OBJS        := $(patsubst $(PROJDIR)/%.cpp,$(INTDIR)/%.o,$(CPPFILES))
@@ -50,10 +51,25 @@ check-env-only:
 $(CONTENT_ID).pkg: pkg.gp4
 	$(TOOLCHAIN)/bin/$(CDIR)/PkgTool.Core pkg_build $< .
 
-assets: sce_sys/icon0.png
+assets: sce_sys/icon0.png $(MEDIA_FLAT)
 
 sce_sys/icon0.png: tools/generate_assets.py
 	python3 tools/generate_assets.py
+
+assets/pt-cover.jpg: assets/media/pt/cover.jpg
+	cp -f $< $@
+
+assets/pt-header.jpg: assets/media/pt/header.jpg
+	cp -f $< $@
+
+assets/pt-screenshot-1.jpg: assets/media/pt/screenshot-1.jpg
+	cp -f $< $@
+
+assets/pt-screenshot-2.jpg: assets/media/pt/screenshot-2.jpg
+	cp -f $< $@
+
+assets/pt-screenshot-3.jpg: assets/media/pt/screenshot-3.jpg
+	cp -f $< $@
 
 pkg.gp4: eboot.bin sce_sys/about/right.sprx sce_sys/param.sfo sce_sys/icon0.png $(LIBMODULES) $(ASSETS)
 	$(TOOLCHAIN)/bin/$(CDIR)/create-gp4 -out $@ --content-id=$(CONTENT_ID) --files "$^"
@@ -81,4 +97,4 @@ $(INTDIR)/%.o: $(PROJDIR)/%.cpp
 	$(CCX) $(CXXFLAGS) -o $@ $<
 
 clean:
-	rm -rf x64 eboot.bin pkg.gp4 sce_sys/param.sfo $(CONTENT_ID).pkg
+	rm -rf x64 eboot.bin pkg.gp4 sce_sys/param.sfo $(CONTENT_ID).pkg $(MEDIA_FLAT)

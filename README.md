@@ -7,7 +7,7 @@ PSForcer, OpenOrbis tabanlı bir PlayStation 4 katalog ve indirme istemcisidir. 
 ## Güncel aşama
 
 - 1920×1080 çözünürlüklü SDL2 mağaza arayüzü
-- Liste ve ayrıntı ekranları
+- Liste ve Steam benzeri geniş başlıklı ayrıntı ekranları
 - Ana oyun, güncelleme, ek paket ve ekstra gruplaması
 - Yerel ve uzak kapak, geniş görsel ve ekran görüntüsü alanları
 - Yalnızca ekranda ihtiyaç duyulan uzak görseller için geçici medya önbelleği
@@ -15,7 +15,7 @@ PSForcer, OpenOrbis tabanlı bir PlayStation 4 katalog ve indirme istemcisidir. 
 - Sürdürülebilir arka plan HTTP(S) indirmeleri
 - Kurucuya teslimden önce SHA-256 bütünlük denetimi
 - Yalnızca kurucu başarı bildirdikten sonra çalışan kurulum sonrası silme seçeneği
-- Hugging Face kullanımına hazır katalog yapısı
+- Hugging Face herkese açık ve yetkili salt-okunur erişim desteği
 
 ## Denetimler
 
@@ -62,6 +62,16 @@ PKG dosyaları Hugging Face üzerinde tutulur. Katalog, açıklamalar ve medya b
 
 Katalog yapısı için [docs/MANIFEST.md](docs/MANIFEST.md) belgesine bakın.
 
+## Hugging Face erişimi
+
+Herkese açık Hugging Face dosyaları ek ayar gerektirmez. Bir paket bağlantısı HTTP `401` döndürürse depo özel, erişim denetimli veya kullanılan hesabın yetkisi dışında olabilir. Yetkili kullanıcı, yalnızca okuma izni olan Hugging Face belirtecini PS4 üzerinde aşağıdaki dosyaya tek satır olarak yazabilir:
+
+```text
+/data/psforcer/hf_token.txt
+```
+
+Belirteç GitHub kataloğuna, uygulama paketine, ekran görüntülerine veya hata kayıtlarına eklenmemelidir. PSForcer bu değeri yalnızca `https://huggingface.co/` isteklerinde `Authorization: Bearer` başlığı olarak kullanır. Erişim izni olmayan bir depo bu yöntemle aşılamaz; depo sahibi dosyayı herkese açık yapmalı veya kullanıcıya meşru okuma izni vermelidir.
+
 ## Bilgisayarda doğrulama
 
 Katalog çözümleyicisi ve SHA-256 uygulaması platformdan bağımsızdır:
@@ -75,4 +85,4 @@ python3 tools/validate_catalog.py assets/catalog.json
 
 ## Proje durumu
 
-Bu sürümde uzak kapaklar, arka planlar ve ekran görüntüleri sınırlı geçici önbellek üzerinden gösterilir. Video alanı veri modelinde bulunur ancak oynatıcı henüz bağlı değildir. Paket indirme, devam ettirme, beklenen boyut denetimi ve isteğe bağlı SHA-256 bütünlük denetimi çalışır; kurulum işlemi açıkça ayrılmış kurucu arayüzünün arkasındadır. Yeni oyunlar `catalog/katalog.json` güncellenerek eklenir ve yeni PSForcer PKG sürümü gerektirmez.
+Bu sürümde P.T. kapak, header ve ekran görüntüleri paket içinde bulunduğu için dış görsel sunucularına bağlı değildir. Diğer katalog kayıtları yerel veya uzak medya bağlantıları kullanabilir. Video alanı veri modelinde bulunur ancak oynatıcı henüz bağlı değildir. Paket indirme, devam ettirme, beklenen boyut denetimi, yetkili Hugging Face erişimi ve isteğe bağlı SHA-256 bütünlük denetimi çalışır; kurulum işlemi açıkça ayrılmış kurucu arayüzünün arkasındadır. Yeni oyunlar `catalog/katalog.json` güncellenerek eklenir ve uygulama kodu değişmediği sürece yeni PSForcer PKG sürümü gerektirmez.

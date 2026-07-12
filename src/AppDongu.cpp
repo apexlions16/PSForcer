@@ -87,7 +87,7 @@ int App::run() {
         if (screen_ == Screen::Browse)
             ui_.drawBrowse(catalog_, visible_, selectedVisible_, filter_, status_);
         else if (!visible_.empty())
-            ui_.drawDetail(catalog_.items[visible_[selectedVisible_]], selectedPackage_, status_);
+            ui_.drawDetailV016(catalog_.items[visible_[selectedVisible_]], selectedPackage_, status_);
         const DownloadSnapshot snapshot = downloads_.snapshot();
         if (snapshot.state == DownloadState::Running || snapshot.state == DownloadState::Verifying)
             ui_.drawDownload(snapshot);
