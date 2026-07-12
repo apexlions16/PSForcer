@@ -1,0 +1,1 @@
+PR takibi için oluşturuldu.
