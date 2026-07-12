@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fcntl.h>
 #include <mutex>
 #include <sstream>
 #include <sys/stat.h>
@@ -17,6 +18,7 @@
 #include <orbis/Net.h>
 #include <orbis/Ssl.h>
 #include <orbis/Sysmodule.h>
+#include <orbis/libkernel.h>
 
 // OpenOrbis başlığında bu üç işlev eski, parametresiz bildirimlerle yer alıyor.
 // Gerçek libSceHttp imzalarına güvenli takma ad veriyoruz.
@@ -37,7 +39,6 @@ int gNetPoolId = 0;
 int gSslContextId = 0;
 int gHttpContextId = 0;
 unsigned int gHttpUsers = 0;
-const uint64_t kPackageRangeSize = 64ULL * 1024ULL * 1024ULL;
 
 bool isHuggingFaceUrl(const std::string& url) {
     return url.compare(0, 23, "https://huggingface.co/") == 0;
@@ -153,6 +154,29 @@ void closeRequestObjects(int& requestId, int& connectionId) {
     requestId = 0;
     connectionId = 0;
 }
+
+void appendDownloadDiagnostic(uint64_t requestedStart,
+                              int32_t statusCode,
+                              const ContentRangeInfo& range,
+                              uint64_t responseBytes,
+                              uint64_t persisted,
+                              bool success,
+                              const std::string& error) {
+    const char* path = "/data/psforcer/indirme_tani.log";
+    FILE* log = std::fopen(path, fileSize(path) > 512 * 1024 ? "wb" : "ab");
+    if (!log) return;
+    std::fprintf(log,
+                 "baslangic=%llu durum=%d aralik=%llu-%llu yanit=%llu dosya=%llu sonuc=%s hata=%s\n",
+                 static_cast<unsigned long long>(requestedStart),
+                 static_cast<int>(statusCode),
+                 static_cast<unsigned long long>(range.start),
+                 static_cast<unsigned long long>(range.end),
+                 static_cast<unsigned long long>(responseBytes),
+                 static_cast<unsigned long long>(persisted),
+                 success ? "basarili" : "basarisiz",
+                 error.empty() ? "-" : error.c_str());
+    std::fclose(log);
+}
 }  // namespace
 #endif
 
@@ -259,26 +283,27 @@ bool HttpClient::download(const std::string& url,
     int templateId = 0;
     int connectionId = 0;
     int requestId = 0;
-    FILE* output = NULL;
+    int outputFd = -1;
     bool success = false;
     uint64_t existing = resume ? fileSize(destination) : 0;
     int32_t statusCode = 0;
     int contentLengthType = 0;
-    size_t responseLength = 0;
+    uint64_t responseLength = 0;
     uint64_t total = 0;
-    uint64_t downloaded = 0;
+    uint64_t downloaded = existing;
     uint64_t requestedStart = existing;
-    uint64_t requestedEnd = 0;
+    uint64_t responseBytes = 0;
+    uint64_t expectedResponseBytes = 0;
+    uint64_t lastSynced = existing;
     ContentRangeInfo contentRange;
     bool rangeRequested = false;
     std::string currentUrl = url;
     bool allowToken = true;
     int redirectCount = 0;
     int authFallbackCount = 0;
-
     std::vector<uint8_t> buffer(512 * 1024);
 
-    templateId = sceHttpCreateTemplate(httpContextId_, "PSForcer/0.20",
+    templateId = sceHttpCreateTemplate(httpContextId_, "PSForcer/0.21",
                                        ORBIS_HTTP_VERSION_1_1, 1);
     if (templateId < 0) {
         error = PSF_SABLON;
@@ -324,15 +349,9 @@ bool HttpClient::download(const std::string& url,
 
         requestedStart = existing;
         rangeRequested = false;
-        if (existing > 0 || expectedSize > kPackageRangeSize) {
+        if (existing > 0) {
             std::ostringstream range;
             range << "bytes=" << requestedStart << '-';
-            if (expectedSize > 0 && requestedStart < expectedSize) {
-                requestedEnd = std::min<uint64_t>(
-                    expectedSize - 1,
-                    requestedStart + kPackageRangeSize - 1);
-                range << requestedEnd;
-            }
             if (sceHttpAddRequestHeader(requestId, "Range",
                                         range.str().c_str(), 0) < 0) {
                 error = "Kaldığı yerden devam başlığı eklenemedi; mevcut parça korundu";
@@ -351,7 +370,6 @@ bool HttpClient::download(const std::string& url,
             goto cleanup;
         }
 
-        // Geçersiz veya eski token, herkese açık bir dosyayı engellemesin.
         if (statusCode == 401 && tokenAdded && authFallbackCount == 0) {
             ++authFallbackCount;
             allowToken = false;
@@ -415,28 +433,32 @@ bool HttpClient::download(const std::string& url,
     }
 
     if (statusCode == 200 && existing > 0) {
-        // Kritik kural: sunucu Range isteğini yok saydığında mevcut .parca
-        // dosyasını asla "wb" ile açma. Böylece sayaç geriye sarmaz.
         error = "Sunucu kaldığı yerden devam isteğini yok saydı; mevcut parça korundu";
         goto cleanup;
     }
 
     if (sceHttpGetResponseContentLength(requestId, &contentLengthType,
-                                        &responseLength) >= 0) {
-        total = existing + static_cast<uint64_t>(responseLength);
+                                         &responseLength) >= 0 &&
+        contentLengthType == ORBIS_HTTP_CONTENTLEN_EXIST) {
+        expectedResponseBytes = responseLength;
+        total = existing + responseLength;
     }
-    if (contentRange.valid && contentRange.total > 0) {
-        total = contentRange.total;
+    if (contentRange.valid) {
+        expectedResponseBytes = contentRange.end - contentRange.start + 1;
+        if (contentRange.total > 0) total = contentRange.total;
     }
     if (expectedSize > 0) total = expectedSize;
 
-    output = std::fopen(destination.c_str(), existing > 0 ? "ab" : "wb");
-    if (!output) {
+    outputFd = sceKernelOpen(destination.c_str(), O_WRONLY | O_CREAT, 0777);
+    if (outputFd < 0) {
         error = PSF_HEDEF;
         goto cleanup;
     }
+    if (!resume && sceKernelFtruncate(outputFd, 0) < 0) {
+        error = "Hedef dosya temizlenemedi";
+        goto cleanup;
+    }
 
-    downloaded = existing;
     if (progress) progress(HttpProgress{downloaded, total});
 
     while (true) {
@@ -456,28 +478,96 @@ bool HttpClient::download(const std::string& url,
             error = message.str();
             goto cleanup;
         }
-        if (read == 0) break;
+        if (read == 0) {
+            if (expectedResponseBytes > 0 &&
+                responseBytes < expectedResponseBytes) {
+                std::ostringstream message;
+                message << "Bağlantı erken kapandı. Bu istekte beklenen "
+                        << expectedResponseBytes << " bayt, alınan "
+                        << responseBytes << " bayt";
+                error = message.str();
+                goto cleanup;
+            }
+            break;
+        }
 
-        const size_t written = std::fwrite(&buffer[0], 1,
-                                           static_cast<size_t>(read), output);
-        if (written != static_cast<size_t>(read)) {
-            error = PSF_YAZMA;
+        const uint64_t readSize = static_cast<uint64_t>(read);
+        if (expectedResponseBytes > 0 &&
+            responseBytes + readSize > expectedResponseBytes) {
+            error = "Sunucu bildirilen aralıktan fazla veri gönderdi";
+            goto cleanup;
+        }
+        if (expectedSize > 0 && downloaded + readSize > expectedSize) {
+            error = "Sunucu katalogda belirtilen dosya boyutundan fazla veri gönderdi";
             goto cleanup;
         }
 
-        downloaded += written;
+        size_t offset = 0;
+        while (offset < static_cast<size_t>(read)) {
+            const size_t remaining = static_cast<size_t>(read) - offset;
+            const size_t written = sceKernelPwrite(
+                outputFd, &buffer[offset], remaining,
+                static_cast<off_t>(downloaded + offset));
+            if (written == 0 || written > remaining) {
+                error = "Dosyaya kalıcı yazma başarısız oldu";
+                goto cleanup;
+            }
+            offset += written;
+        }
+
+        downloaded += readSize;
+        responseBytes += readSize;
+
+        if (downloaded - lastSynced >= 8ULL * 1024ULL * 1024ULL) {
+            if (sceKernelFsync(outputFd) < 0) {
+                error = "İndirilen veri diske kaydedilemedi";
+                goto cleanup;
+            }
+            const uint64_t persisted = fileSize(destination);
+            if (persisted < downloaded) {
+                std::ostringstream message;
+                message << "Kalıcı dosya boyutu geride kaldı. Yazılan "
+                        << downloaded << " bayt, diskte " << persisted << " bayt";
+                error = message.str();
+                goto cleanup;
+            }
+            lastSynced = downloaded;
+        }
+
         if (progress) progress(HttpProgress{downloaded, total});
     }
 
-    if (std::fflush(output) != 0) {
-        error = PSF_YAZMA;
+    if (sceKernelFsync(outputFd) < 0) {
+        error = "İndirilen veri diske kaydedilemedi";
+        goto cleanup;
+    }
+    if (fileSize(destination) < downloaded) {
+        error = "İndirme tamamlandı ancak kalıcı dosya boyutu doğrulanamadı";
         goto cleanup;
     }
 
     success = true;
 
 cleanup:
-    if (output) std::fclose(output);
+    if (outputFd >= 0) {
+        sceKernelFsync(outputFd);
+        sceKernelClose(outputFd);
+        outputFd = -1;
+    }
+
+    {
+        const uint64_t persisted = fileSize(destination);
+        if (downloaded > persisted) {
+            success = false;
+            std::ostringstream message;
+            message << "Dosya yazımı geriye düştü. Bellekte " << downloaded
+                    << " bayt, diskte " << persisted << " bayt";
+            error = message.str();
+        }
+        appendDownloadDiagnostic(requestedStart, statusCode, contentRange,
+                                 responseBytes, persisted, success, error);
+    }
+
     closeRequestObjects(requestId, connectionId);
     if (templateId > 0) sceHttpDeleteTemplate(templateId);
     return success;
@@ -533,6 +623,7 @@ cleanup:
         if (read < buffer.size()) break;
     }
 
+    std::fflush(output);
     std::fclose(output);
     std::fclose(input);
     return success;
