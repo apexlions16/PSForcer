@@ -1,4 +1,4 @@
-# PSForcer OpenOrbis paket bilgileri
+# PSForcer OpenOrbis paket bilgileri - v0.18
 TITLE       := PSForcer
 VERSION     := 0.18
 TITLE_ID    := PSFC00001
