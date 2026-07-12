@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "catalogTitle": "PSForcer İçerik Kütüphanesi",
-  "updatedAt": "2026-07-12T13:30:00Z",
+  "updatedAt": "2026-07-12T14:20:00Z",
   "items": [
     {
       "id": "pt-cusa01127-usa",
@@ -15,13 +15,13 @@
       "releaseYear": 2014,
       "accent": "8A1F2D",
       "media": {
-        "cover": "https://cdn.mos.cms.futurecdn.net/dN5pYMUVGmwoATyNUojQF3.jpg",
-        "hero": "https://cdn.mos.cms.futurecdn.net/dN5pYMUVGmwoATyNUojQF3.jpg",
+        "cover": "/app0/assets/media/pt/cover.jpg",
+        "hero": "/app0/assets/media/pt/header.jpg",
         "trailer": "",
         "screenshots": [
-          "https://cdn.mos.cms.futurecdn.net/88da048b885585c75c59b41f623f075a.jpg",
-          "https://cdn.mos.cms.futurecdn.net/11d6de1006bc8dcc5322133d7517fdbb.jpeg",
-          "https://cdn.mos.cms.futurecdn.net/b8d61d8538197dfedfe273150ef9e4cd.jpg"
+          "/app0/assets/media/pt/screenshot-1.jpg",
+          "/app0/assets/media/pt/screenshot-2.jpg",
+          "/app0/assets/media/pt/screenshot-3.jpg"
         ]
       },
       "packages": [
