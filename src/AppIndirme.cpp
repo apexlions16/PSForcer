@@ -13,20 +13,22 @@ bool sonDurum(DownloadState state) {
 
 void App::startPackageDownload() {
     if (downloads_.busy() || visible_.empty()) {
-        if (downloads_.busy()) setToast("Bir indirme zaten çalışıyor");
+        if (downloads_.busy()) setToast("Bir paket indirmesi zaten çalışıyor");
         return;
     }
+
     const size_t itemIndex = visible_[selectedVisible_];
     const CatalogItem& item = catalog_.items[itemIndex];
     if (item.packages.empty() || selectedPackage_ >= item.packages.size()) return;
     const PackageInfo& package = item.packages[selectedPackage_];
     if (package.url.empty()) {
-        setToast("Bu örnek paket için henüz bağlantı eklenmedi");
+        setToast("Bu paket için indirme bağlantısı eklenmedi");
         return;
     }
 
     const std::string baseName = sanitizeFileName(item.id + "-" + package.id + "-" + package.version + ".pkg");
     pendingFinalPath_ = runtimeRoot() + "/indirmeler/" + baseName;
+
     DownloadRequest request;
     request.jobId = nextJobId_++;
     request.id = package.id;
@@ -34,30 +36,34 @@ void App::startPackageDownload() {
     request.url = package.url;
     request.destination = pendingFinalPath_ + ".parca";
     request.sha256 = package.sha256;
+    request.expectedSize = package.sizeBytes;
     request.resume = true;
 
     std::string error;
     if (!downloads_.start(request, error)) {
-        setToast(error);
+        setToast(error, 6500);
+        status_ = "İndirme başlatılamadı";
         return;
     }
-    pendingCatalog_ = false;
+
     pendingItemIndex_ = itemIndex;
     pendingPackageIndex_ = selectedPackage_;
     status_ = "İndirme başlatıldı";
 }
 
-void App::refreshCatalog() {
-    if (downloads_.busy()) {
-        setToast("Kataloğu yenilemeden önce mevcut indirmenin bitmesini bekleyin");
+void App::refreshCatalog(bool silent) {
+    if (catalogDownloads_.busy()) {
+        if (!silent) setToast("Katalog zaten yenileniyor");
         return;
     }
+
     std::string url = readFirstLine(runtimeRoot() + "/katalog_adresi.txt");
     if (url.empty()) url = readFirstLine(bundledPath("assets/katalog_adresi.txt"));
     if (url.empty()) {
-        setToast("/data/psforcer/katalog_adresi.txt dosyasına katalog bağlantısını yazın", 6500);
+        if (!silent) setToast("/data/psforcer/katalog_adresi.txt dosyasına katalog bağlantısını yazın", 6500);
         return;
     }
+
     DownloadRequest request;
     request.jobId = nextJobId_++;
     request.id = "katalog-yenileme";
@@ -67,13 +73,50 @@ void App::refreshCatalog() {
     request.resume = false;
 
     std::string error;
-    if (!downloads_.start(request, error)) {
-        setToast(error);
+    if (!catalogDownloads_.start(request, error)) {
+        if (!silent) setToast(error, 6500);
         return;
     }
-    pendingCatalog_ = true;
-    pendingFinalPath_ = runtimeRoot() + "/katalog.json";
+
+    catalogRefreshSilent_ = silent;
+    catalogFinalPath_ = runtimeRoot() + "/katalog.json";
     status_ = "Katalog indiriliyor";
+}
+
+void App::processCatalogCompletion() {
+    const DownloadSnapshot snapshot = catalogDownloads_.snapshot();
+    if (!sonDurum(snapshot.state) || snapshot.jobId == 0 || snapshot.jobId == lastHandledCatalogJobId_) return;
+    lastHandledCatalogJobId_ = snapshot.jobId;
+
+    if (snapshot.state == DownloadState::Failed || snapshot.state == DownloadState::Cancelled) {
+        status_ = "Yerleşik katalog kullanılıyor";
+        if (!catalogRefreshSilent_) {
+            setToast(snapshot.error.empty() ? "Katalog yenilenemedi" : snapshot.error, 6500);
+        }
+        catalogDownloads_.reset();
+        return;
+    }
+
+    std::remove(catalogFinalPath_.c_str());
+    if (std::rename(snapshot.destination.c_str(), catalogFinalPath_.c_str()) != 0) {
+        if (!catalogRefreshSilent_) setToast("Katalog dosyası etkinleştirilemedi", 6500);
+        catalogDownloads_.reset();
+        return;
+    }
+
+    std::string error;
+    if (loadCatalog(error)) {
+        selectedVisible_ = 0;
+        selectedPackage_ = 0;
+        rebuildVisible();
+        status_ = "Katalog güncel";
+        if (!catalogRefreshSilent_) setToast("Katalog yenilendi");
+    } else {
+        status_ = "Yeni katalog geçersiz";
+        if (!catalogRefreshSilent_) setToast("Yeni katalog geçersiz: " + error, 7000);
+    }
+
+    catalogDownloads_.reset();
 }
 
 void App::processDownloadCompletion() {
@@ -83,41 +126,21 @@ void App::processDownloadCompletion() {
 
     if (snapshot.state == DownloadState::Failed || snapshot.state == DownloadState::Cancelled) {
         status_ = snapshot.state == DownloadState::Cancelled ? "İndirme iptal edildi" : "İndirme başarısız";
-        setToast(snapshot.error.empty() ? status_ : snapshot.error, 6000);
-        downloads_.reset();
-        return;
-    }
-
-    if (pendingCatalog_) {
-        std::remove(pendingFinalPath_.c_str());
-        if (std::rename(snapshot.destination.c_str(), pendingFinalPath_.c_str()) != 0) {
-            setToast("Katalog dosyası etkinleştirilemedi");
-            downloads_.reset();
-            return;
-        }
-        std::string error;
-        if (loadCatalog(error)) {
-            selectedVisible_ = 0;
-            selectedPackage_ = 0;
-            rebuildVisible();
-            setToast("Katalog yenilendi");
-            status_ = "Katalog güncel";
-        } else {
-            setToast("Yeni katalog geçersiz: " + error, 7000);
-        }
+        setToast(snapshot.error.empty() ? status_ : snapshot.error, 7000);
         downloads_.reset();
         return;
     }
 
     std::remove(pendingFinalPath_.c_str());
     if (std::rename(snapshot.destination.c_str(), pendingFinalPath_.c_str()) != 0) {
-        setToast("Doğrulanan paket yeniden adlandırılamadı");
+        setToast("Doğrulanan paket yeniden adlandırılamadı", 6500);
         downloads_.reset();
         return;
     }
+
     if (pendingItemIndex_ >= catalog_.items.size() ||
         pendingPackageIndex_ >= catalog_.items[pendingItemIndex_].packages.size()) {
-        setToast("İndirme katalog kaydıyla eşleştirilemedi");
+        setToast("İndirme katalog kaydıyla eşleştirilemedi", 6500);
         downloads_.reset();
         return;
     }

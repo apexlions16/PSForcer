@@ -8,7 +8,7 @@ void App::handleAction(Action action, bool& running) {
         return;
     }
     if (action == Action::Refresh) {
-        refreshCatalog();
+        refreshCatalog(false);
         return;
     }
     if (screen_ == Screen::Browse) {
@@ -80,6 +80,8 @@ int App::run() {
     bool running = true;
     while (running) {
         processEvents(running);
+        mediaCache_.update();
+        processCatalogCompletion();
         processDownloadCompletion();
         if (!toast_.empty() && SDL_TICKS_PASSED(SDL_GetTicks(), toastUntil_)) toast_.clear();
         if (screen_ == Screen::Browse)

@@ -5,8 +5,13 @@
 #include <atomic>
 #include <mutex>
 #include <string>
-#include <thread>
 #include <stdint.h>
+
+#if defined(PSFORCER_ORBIS)
+#include <SDL2/SDL_thread.h>
+#else
+#include <thread>
+#endif
 
 namespace psforcer {
 
@@ -19,8 +24,9 @@ struct DownloadRequest {
     std::string url;
     std::string destination;
     std::string sha256;
+    uint64_t expectedSize;
     bool resume;
-    DownloadRequest() : jobId(0), resume(true) {}
+    DownloadRequest() : jobId(0), expectedSize(0), resume(true) {}
 };
 
 struct DownloadSnapshot {
@@ -41,13 +47,21 @@ public:
     ~DownloadManager();
     bool start(const DownloadRequest& request, std::string& error);
     void cancel();
+    void stopAndWait();
     void reset();
     DownloadSnapshot snapshot() const;
     bool busy() const;
 private:
     void run(DownloadRequest request);
-    mutable std::mutex mutex_;
+    void waitWorker();
+#if defined(PSFORCER_ORBIS)
+    static int threadEntry(void* data);
+    SDL_Thread* worker_;
+    DownloadRequest pendingRequest_;
+#else
     std::thread worker_;
+#endif
+    mutable std::mutex mutex_;
     std::atomic<bool> cancelRequested_;
     DownloadSnapshot snapshot_;
     HttpClient client_;

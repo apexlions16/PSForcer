@@ -46,7 +46,12 @@ void Ui::shutdown() {
     for (std::map<std::string, SDL_Texture*>::iterator it = textures_.begin(); it != textures_.end(); ++it)
         SDL_DestroyTexture(it->second);
     textures_.clear();
+    mediaResolver_ = std::function<std::string(const std::string&)>();
     IMG_Quit();
+}
+
+void Ui::setMediaResolver(const std::function<std::string(const std::string&)>& resolver) {
+    mediaResolver_ = resolver;
 }
 
 void Ui::fillRect(int x, int y, int w, int h, const Color& color) {
@@ -105,12 +110,23 @@ void Ui::drawWrapped(const std::string& text, int x, int y, int width, int heigh
 }
 
 SDL_Texture* Ui::texture(const std::string& path) {
-    if (path.empty() || path.compare(0, 7, "http://") == 0 || path.compare(0, 8, "https://") == 0) return NULL;
+    if (path.empty()) return NULL;
+
     std::map<std::string, SDL_Texture*>::iterator bulunan = textures_.find(path);
     if (bulunan != textures_.end()) return bulunan->second;
-    SDL_Texture* yuklenen = IMG_LoadTexture(renderer_, path.c_str());
+
+    std::string yerelYol = path;
+    const bool uzak = path.compare(0, 7, "http://") == 0 || path.compare(0, 8, "https://") == 0;
+    if (uzak) {
+        if (!mediaResolver_) return NULL;
+        yerelYol = mediaResolver_(path);
+        if (yerelYol.empty()) return NULL;
+    }
+
+    SDL_Texture* yuklenen = IMG_LoadTexture(renderer_, yerelYol.c_str());
 #if !defined(PSFORCER_ORBIS)
-    if (!yuklenen && path.compare(0, 6, "/app0/") == 0) yuklenen = IMG_LoadTexture(renderer_, path.substr(6).c_str());
+    if (!yuklenen && yerelYol.compare(0, 6, "/app0/") == 0)
+        yuklenen = IMG_LoadTexture(renderer_, yerelYol.substr(6).c_str());
 #endif
     if (yuklenen) textures_[path] = yuklenen;
     return yuklenen;
@@ -268,6 +284,19 @@ void Ui::drawDetail(const CatalogItem& item, size_t selectedPackage, const std::
         if (!paket.minFirmware.empty()) surum << "  YAZILIM " << paket.minFirmware;
         drawText(surum.str(), 1050, y + 47, 17, Color(132, 143, 168), 430);
         drawText(CatalogLoader::formatBytes(paket.sizeBytes), 1580, y + 25, 20, Color(225, 230, 241), 220);
+    }
+
+    if (!item.media.screenshots.empty()) {
+        drawText("GÖRSELLER", 72, 748, 22, Color(126, 138, 166));
+        const size_t adet = std::min<size_t>(3, item.media.screenshots.size());
+        for (size_t i = 0; i < adet; ++i) {
+            const int x = 72 + static_cast<int>(i) * 228;
+            const int y = 790;
+            fillRect(x, y, 210, 118, Color(20, 25, 42));
+            SDL_Texture* goruntu = texture(item.media.screenshots[i]);
+            if (goruntu) drawImage(goruntu, x, y, 210, 118, true);
+            strokeRect(x, y, 210, 118, Color(65, 73, 96), 2);
+        }
     }
 
     fillRect(0, 1018, kEkranGenisligi, 62, Color(14, 18, 31));

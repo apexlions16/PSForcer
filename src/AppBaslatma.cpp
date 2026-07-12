@@ -15,7 +15,8 @@ const int kSutunSayisi = 4;
 App::App()
     : window_(NULL), renderer_(NULL), controller_(NULL), screen_(Screen::Browse), filter_(0),
       selectedVisible_(0), selectedPackage_(0), toastUntil_(0), installer_(new ManualInstaller()),
-      nextJobId_(1), lastHandledJobId_(0), pendingCatalog_(false), pendingItemIndex_(0), pendingPackageIndex_(0) {}
+      nextJobId_(1), lastHandledJobId_(0), lastHandledCatalogJobId_(0),
+      pendingItemIndex_(0), pendingPackageIndex_(0), catalogRefreshSilent_(false) {}
 
 App::~App() { shutdown(); }
 
@@ -57,17 +58,31 @@ bool App::initialize(std::string& error) {
     if (!ui_.initialize(renderer_, error)) return false;
     SDL_JoystickEventState(SDL_ENABLE);
     if (SDL_NumJoysticks() > 0) controller_ = SDL_JoystickOpen(0);
+
     ensureDirectory(runtimeRoot());
     ensureDirectory(runtimeRoot() + "/indirmeler");
     ensureDirectory(runtimeRoot() + "/gorseller");
+
+    std::string mediaError;
+    mediaCache_.initialize(runtimeRoot() + "/gecici-medya", mediaError);
+    ui_.setMediaResolver([this](const std::string& path) {
+        return mediaCache_.resolve(path);
+    });
+
     if (!loadCatalog(error)) return false;
     rebuildVisible();
-    status_ = "Hazır";
+    status_ = mediaError.empty() ? "Hazır" : "Hazır - görsel önbelleği kullanılamıyor";
+
+    // Uygulama açıldığında GitHub'daki hafif katalog kendiliğinden yenilenir.
+    // Başarısız olursa yerleşik katalog kullanılmaya devam eder.
+    refreshCatalog(true);
     return true;
 }
 
 void App::shutdown() {
-    downloads_.cancel();
+    downloads_.stopAndWait();
+    catalogDownloads_.stopAndWait();
+    mediaCache_.shutdown();
     ui_.shutdown();
     if (controller_) SDL_JoystickClose(controller_);
     controller_ = NULL;

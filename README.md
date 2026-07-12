@@ -9,9 +9,9 @@ PSForcer, OpenOrbis tabanlı bir PlayStation 4 katalog ve indirme istemcisidir. 
 - 1920×1080 çözünürlüklü SDL2 mağaza arayüzü
 - Liste ve ayrıntı ekranları
 - Ana oyun, güncelleme, ek paket ve ekstra gruplaması
-- Yerel kapak ve geniş görsel alanları
-- Uzak görsel ve video bağlantısı alanları
-- Paket içinden yüklenen veya uzaktan yenilenen JSON kataloğu
+- Yerel ve uzak kapak, geniş görsel ve ekran görüntüsü alanları
+- Yalnızca ekranda ihtiyaç duyulan uzak görseller için geçici medya önbelleği
+- Paket içinden yüklenen ve GitHub üzerinden açılışta otomatik yenilenen JSON kataloğu
 - Sürdürülebilir arka plan HTTP(S) indirmeleri
 - Kurucuya teslimden önce SHA-256 bütünlük denetimi
 - Yalnızca kurucu başarı bildirdikten sonra çalışan kurulum sonrası silme seçeneği
@@ -58,7 +58,7 @@ Konsolda şu metin dosyasını oluşturun:
 
 Dosyaya tek bir HTTPS bağlantısı yazın. Paket içinde boş bir örnek dosya da bulunur. PSForcer içinde Üçgen düğmesine basıldığında katalog `/data/psforcer/katalog.json` konumuna indirilir ve yeniden yüklenir.
 
-Hugging Face bağlantıları daha sonra eklenecektir. Sabit bir `resolve/main/catalog.json` bağlantısı kullanılması önerilir. Her paket kaydı ana oyun, güncelleme, ek paket veya ekstra PKG dosyasına ayrı ayrı bağlanabilir.
+PKG dosyaları Hugging Face üzerinde tutulur. Katalog, açıklamalar ve medya bağlantıları GitHub’daki `catalog/katalog.json` dosyasından alınır. Her paket kaydı farklı bir Hugging Face deposundaki doğrudan `resolve` bağlantısına bağlanabilir.
 
 Katalog yapısı için [docs/MANIFEST.md](docs/MANIFEST.md) belgesine bakın.
 
@@ -75,4 +75,4 @@ python3 tools/validate_catalog.py assets/catalog.json
 
 ## Proje durumu
 
-Bu sürüm çalışan ilk mağaza aşamasıdır. Uzak kapak önbelleği ve video oynatma veri modelinde bulunur ancak henüz oynatıcıya bağlanmamıştır. Paket indirme ve bütünlük denetimi çalışır; kurulum işlemi açıkça ayrılmış kurucu arayüzünün arkasındadır.
+Bu sürümde uzak kapaklar, arka planlar ve ekran görüntüleri sınırlı geçici önbellek üzerinden gösterilir. Video alanı veri modelinde bulunur ancak oynatıcı henüz bağlı değildir. Paket indirme, devam ettirme, beklenen boyut denetimi ve isteğe bağlı SHA-256 bütünlük denetimi çalışır; kurulum işlemi açıkça ayrılmış kurucu arayüzünün arkasındadır. Yeni oyunlar `catalog/katalog.json` güncellenerek eklenir ve yeni PSForcer PKG sürümü gerektirmez.

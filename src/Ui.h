@@ -4,6 +4,7 @@
 #include "DownloadManager.h"
 
 #include <SDL2/SDL.h>
+#include <functional>
 #include <map>
 #include <string>
 #include <vector>
@@ -16,6 +17,7 @@ public:
     ~Ui();
     bool initialize(SDL_Renderer* renderer, std::string& error);
     void shutdown();
+    void setMediaResolver(const std::function<std::string(const std::string&)>& resolver);
     void drawBrowse(const CatalogData& catalog,
                     const std::vector<size_t>& visible,
                     size_t selected,
@@ -38,6 +40,7 @@ private:
     static std::string asciiSafe(const std::string& value);
     SDL_Renderer* renderer_;
     std::map<std::string, SDL_Texture*> textures_;
+    std::function<std::string(const std::string&)> mediaResolver_;
 };
 
 }  // namespace psforcer
