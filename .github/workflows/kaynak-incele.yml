@@ -1,10 +1,8 @@
 name: Geçici kaynak inceleme
 
 on:
-  workflow_dispatch:
-  push:
-    paths:
-      - '.github/workflows/kaynak-incele.yml'
+  pull_request:
+    branches: [main]
 
 jobs:
   incele:
