@@ -1,6 +1,6 @@
-# PSForcer OpenOrbis package metadata
+# PSForcer OpenOrbis paket bilgileri
 TITLE       := PSForcer
-VERSION     := 0.11
+VERSION     := 0.12
 TITLE_ID    := PSFC00001
 CONTENT_ID  := IV0000-PSFC00001_00-PSFORCERCLIENT00
 
@@ -34,18 +34,18 @@ endif
 all: check-env assets $(CONTENT_ID).pkg
 
 check-env:
-	@test -n "$(OO_PS4_TOOLCHAIN)" || (echo "OO_PS4_TOOLCHAIN is not set" && exit 1)
-	@test -f sce_sys/about/right.sprx || (echo "Run 'make bootstrap' first" && exit 1)
-	@test -n "$(LIBMODULES)" || (echo "Run 'make bootstrap' first" && exit 1)
+	@test -n "$(OO_PS4_TOOLCHAIN)" || (echo "OO_PS4_TOOLCHAIN ayarlanmadı" && exit 1)
+	@test -f sce_sys/about/right.sprx || (echo "Önce 'make bootstrap' çalıştırın" && exit 1)
+	@test -n "$(LIBMODULES)" || (echo "Önce 'make bootstrap' çalıştırın" && exit 1)
 
 bootstrap: check-env-only
 	@mkdir -p sce_module sce_sys/about
 	@cp -f "$(TOOLCHAIN)/samples/SDL2/sce_module/"* sce_module/
 	@cp -f "$(TOOLCHAIN)/samples/SDL2/sce_sys/about/right.sprx" sce_sys/about/right.sprx
-	@echo "OpenOrbis runtime package files copied."
+	@echo "OpenOrbis çalışma dosyaları kopyalandı."
 
 check-env-only:
-	@test -n "$(OO_PS4_TOOLCHAIN)" || (echo "OO_PS4_TOOLCHAIN is not set" && exit 1)
+	@test -n "$(OO_PS4_TOOLCHAIN)" || (echo "OO_PS4_TOOLCHAIN ayarlanmadı" && exit 1)
 
 $(CONTENT_ID).pkg: pkg.gp4
 	$(TOOLCHAIN)/bin/$(CDIR)/PkgTool.Core pkg_build $< .
