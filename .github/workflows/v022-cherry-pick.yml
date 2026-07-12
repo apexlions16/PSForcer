@@ -1,0 +1,28 @@
+name: v0.2.2 kaynak düzeltmesini uygula
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/v022-cherry-pick.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  uygula:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Doğrulanmış kaynak değişikliğini uygula
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git cherry-pick f3ecf842a14f6a5085b0730a3c23adf5debde05c
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
