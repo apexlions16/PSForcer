@@ -1,0 +1,19 @@
+name: Geçici kaynak inceleme
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/kaynak-incele.yml'
+
+jobs:
+  incele:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Kaynak dosyalarını ve App yöntemlerini yaz
+        run: |
+          echo '--- SRC DOSYALARI ---'
+          find src -maxdepth 1 -type f -print | sort
+          echo '--- APP YÖNTEMLERİ ---'
+          grep -R -n 'App::' src || true
