@@ -1,143 +1,39 @@
 {
   "schemaVersion": 1,
   "catalogTitle": "PSForcer İçerik Kütüphanesi",
-  "updatedAt": "2026-07-12T00:00:00Z",
+  "updatedAt": "2026-07-12T13:00:00Z",
   "items": [
     {
-      "id": "neon-ufuk",
-      "title": "Neon Ufuk",
-      "developer": "Zirve Tanıtım Stüdyosu",
-      "genre": "Aksiyon",
-      "description": "PSForcer katalog düzenini, paket gruplarını ve görsel alanlarını göstermek için hazırlanmış hızlı bir bilim kurgu aksiyon örneği. Hugging Face dosyaları hazır olduğunda örnek adresleri gerçek bağlantılarla değiştirin.",
-      "releaseYear": 2026,
-      "accent": "6C63FF",
+      "id": "pt-cusa01127-usa",
+      "titleId": "CUSA01127",
+      "region": "ABD",
+      "title": "P.T.",
+      "developer": "Kojima Productions / 7780s Studio",
+      "publisher": "Konami Digital Entertainment",
+      "genre": "Psikolojik Korku",
+      "description": "P.T. (Playable Teaser), iptal edilen Silent Hills projesini tanıtmak için yayımlanan birinci şahıs psikolojik korku deneyimidir. Oyuncu, küçük değişikliklerle sürekli yeniden şekillenen tekinsiz bir koridorda ilerler.",
+      "releaseYear": 2014,
+      "accent": "8A1F2D",
       "media": {
-        "cover": "",
-        "hero": "",
+        "cover": "https://www.gamespot.com/wp-content/uploads/original/1179/11799911/2854797-pt.jpg",
+        "hero": "https://cdn.mos.cms.futurecdn.net/dN5pYMUVGmwoATyNUojQF3.jpg",
         "trailer": "",
-        "screenshots": []
+        "screenshots": [
+          "https://cdn.mos.cms.futurecdn.net/88da048b885585c75c59b41f623f075a.jpg",
+          "https://cdn.mos.cms.futurecdn.net/11d6de1006bc8dcc5322133d7517fdbb.jpeg",
+          "https://cdn.mos.cms.futurecdn.net/b8d61d8538197dfedfe273150ef9e4cd.jpg"
+        ]
       },
       "packages": [
         {
-          "id": "ana-100",
+          "id": "cusa01127-usa-ana-100",
           "kind": "oyun",
           "label": "Ana Oyun",
           "version": "1.00",
-          "size": 2147483648,
-          "url": "",
-          "sha256": "",
-          "minFirmware": "9.00",
-          "deleteAfterInstall": false
-        },
-        {
-          "id": "guncelleme-110",
-          "kind": "guncelleme",
-          "label": "Güncelleme 1.10",
-          "version": "1.10",
-          "size": 536870912,
-          "url": "",
-          "sha256": "",
-          "minFirmware": "9.00",
-          "deleteAfterInstall": false
-        },
-        {
-          "id": "muzik-albumu",
-          "kind": "ekstra",
-          "label": "Dijital Müzik Albümü",
-          "version": "1.00",
-          "size": 157286400,
-          "url": "",
+          "size": 1478164480,
+          "url": "https://huggingface.co/datasets/glm-labs/entroylab/resolve/main/PPCH4/CUSA01127-USA.pkg",
           "sha256": "",
           "minFirmware": "",
-          "deleteAfterInstall": false
-        }
-      ]
-    },
-    {
-      "id": "kul-sirti",
-      "title": "Kül Sırtı",
-      "developer": "Kuzey Çizgisi Etkileşim",
-      "genre": "Macera",
-      "description": "Uzak bir dağ yerleşimini keşfedin, geçmişini ortaya çıkarın ve büyüyen öykü ek paketlerini yönetin. Bu örnek, ek paket gruplamasını ve geniş kapak alanını gösterir.",
-      "releaseYear": 2025,
-      "accent": "E07A5F",
-      "media": {
-        "cover": "",
-        "hero": "",
-        "trailer": "",
-        "screenshots": []
-      },
-      "packages": [
-        {
-          "id": "ana-100",
-          "kind": "oyun",
-          "label": "Ana Oyun",
-          "version": "1.00",
-          "size": 4294967296,
-          "url": "",
-          "sha256": "",
-          "minFirmware": "9.00",
-          "deleteAfterInstall": false
-        },
-        {
-          "id": "gizli-vadi",
-          "kind": "ek-paket",
-          "label": "Gizli Vadi Ek Paketi",
-          "version": "1.00",
-          "size": 805306368,
-          "url": "",
-          "sha256": "",
-          "minFirmware": "9.00",
-          "deleteAfterInstall": false
-        }
-      ]
-    },
-    {
-      "id": "hiz-izgarasi",
-      "title": "Hız Izgarası",
-      "developer": "Nabız Atölyesi",
-      "genre": "Yarış",
-      "description": "Ana oyun, başarım güncellemesi ve ek araç paketi içeren sade bir yarış kataloğu örneği. Paket seçimini ve kategori filtrelerini denemek için kullanılır.",
-      "releaseYear": 2026,
-      "accent": "2A9D8F",
-      "media": {
-        "cover": "",
-        "hero": "",
-        "trailer": "",
-        "screenshots": []
-      },
-      "packages": [
-        {
-          "id": "ana-100",
-          "kind": "oyun",
-          "label": "Ana Oyun",
-          "version": "1.00",
-          "size": 3221225472,
-          "url": "",
-          "sha256": "",
-          "minFirmware": "9.00",
-          "deleteAfterInstall": false
-        },
-        {
-          "id": "guncelleme-102",
-          "kind": "guncelleme",
-          "label": "Başarım Güncellemesi",
-          "version": "1.02",
-          "size": 268435456,
-          "url": "",
-          "sha256": "",
-          "minFirmware": "9.00",
-          "deleteAfterInstall": false
-        },
-        {
-          "id": "ek-araclar",
-          "kind": "ek-paket",
-          "label": "Ek Araç Paketi",
-          "version": "1.00",
-          "size": 104857600,
-          "url": "",
-          "sha256": "",
-          "minFirmware": "9.00",
           "deleteAfterInstall": false
         }
       ]
