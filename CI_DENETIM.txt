@@ -1,1 +1,1 @@
-geçici
+Bu dosya yalnızca GitHub Actions üzerinde Türkçe arayüz derlemesini denetlemek için kullanılır.
