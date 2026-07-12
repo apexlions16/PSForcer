@@ -19,8 +19,11 @@ jobs:
             echo '--- İNDİRME BAŞLATMA ÇAĞRILARI ---'
             grep -R -n 'downloads_\|startPackageDownload\|sceHttp' src || true
           } > kaynak-inceleme.txt
+          zip -qr kaynak-anlik-goruntu.zip . -x '.git/*' 'kaynak-anlik-goruntu.zip'
       - name: İnceleme çıktısını sakla
         uses: actions/upload-artifact@v4
         with:
           name: kaynak-inceleme
-          path: kaynak-inceleme.txt
+          path: |
+            kaynak-inceleme.txt
+            kaynak-anlik-goruntu.zip
