@@ -1,73 +1,73 @@
-# PSForcer catalog manifest
+# PSForcer katalog bildirimi
 
-PSForcer reads one JSON document. The bundled example is `assets/catalog.json`; the same shape can be hosted on Hugging Face.
+PSForcer tek bir JSON belgesi okur. Paket içindeki örnek `assets/catalog.json` dosyasıdır; aynı yapı Hugging Face üzerinde barındırılabilir.
 
-## Top-level fields
+## Üst düzey alanlar
 
-| Field | Type | Purpose |
+| Alan | Tür | Amaç |
 |---|---|---|
-| `schemaVersion` | integer | Must be `1` |
-| `catalogTitle` | string | Display name |
-| `updatedAt` | string | Human-readable or ISO-8601 timestamp |
-| `items` | array | Games/products shown in the storefront |
+| `schemaVersion` | tam sayı | Değer `1` olmalıdır |
+| `catalogTitle` | metin | Görünen katalog adı |
+| `updatedAt` | metin | Okunabilir tarih veya ISO-8601 zaman damgası |
+| `items` | dizi | Mağazada gösterilen oyunlar ve ürünler |
 
-## Item fields
+## İçerik alanları
 
-- `id`: stable ASCII identifier
-- `title`: game title
-- `developer`, `genre`, `description`
-- `releaseYear`: integer
-- `accent`: six-digit RGB hex color
-- `media.cover`: local `/app0/...` path or remote HTTPS URL
-- `media.hero`: local `/app0/...` path or remote HTTPS URL
-- `media.trailer`: optional trailer URL
-- `media.screenshots`: array of image URLs
-- `packages`: array of downloadable package records
+- `id`: değişmeyen ASCII tanımlayıcısı
+- `title`: oyun adı
+- `developer`, `genre`, `description`: geliştirici, tür ve açıklama
+- `releaseYear`: çıkış yılı
+- `accent`: altı basamaklı RGB onaltılık renk
+- `media.cover`: yerel `/app0/...` yolu veya uzak HTTPS bağlantısı
+- `media.hero`: yerel `/app0/...` yolu veya uzak HTTPS bağlantısı
+- `media.trailer`: isteğe bağlı tanıtım videosu bağlantısı
+- `media.screenshots`: görsel bağlantıları dizisi
+- `packages`: indirilebilir paket kayıtları dizisi
 
-## Package fields
+## Paket alanları
 
-| Field | Required | Notes |
+| Alan | Zorunlu | Açıklama |
 |---|---|---|
-| `id` | yes | Unique within the item |
-| `kind` | yes | `game`, `update`, `dlc`, or `extra` |
-| `label` | yes | User-facing label |
-| `version` | yes | Displayed version |
-| `size` | yes | Byte size as an integer |
-| `url` | for downloads | HTTPS URL, including a Hugging Face file URL |
-| `sha256` | strongly recommended | Lowercase SHA-256 digest |
-| `minFirmware` | optional | Informational firmware value |
-| `deleteAfterInstall` | optional | Defaults to `false`; deletion occurs only after installer success |
+| `id` | evet | İçerik içinde benzersiz olmalıdır |
+| `kind` | evet | `oyun`, `guncelleme`, `ek-paket` veya `ekstra` |
+| `label` | evet | Kullanıcıya gösterilen ad |
+| `version` | evet | Gösterilen sürüm |
+| `size` | evet | Bayt cinsinden tam sayı |
+| `url` | indirme için | Hugging Face dosya bağlantısı dâhil HTTPS adresi |
+| `sha256` | kesinlikle önerilir | Küçük harfli SHA-256 özeti |
+| `minFirmware` | isteğe bağlı | Bilgilendirme amaçlı sistem yazılımı değeri |
+| `deleteAfterInstall` | isteğe bağlı | Varsayılan `false`; yalnızca kurucu başarı bildirdikten sonra silinir |
 
-## Example
+## Örnek
 
 ```json
 {
   "schemaVersion": 1,
-  "catalogTitle": "PSForcer",
+  "catalogTitle": "PSForcer İçerik Kütüphanesi",
   "updatedAt": "2026-07-12T00:00:00Z",
   "items": [
     {
-      "id": "sample-game",
-      "title": "Sample Game",
-      "developer": "Studio",
-      "genre": "Action",
-      "description": "Catalog description.",
+      "id": "ornek-oyun",
+      "title": "Örnek Oyun",
+      "developer": "Örnek Stüdyo",
+      "genre": "Aksiyon",
+      "description": "Katalog açıklaması.",
       "releaseYear": 2026,
       "accent": "6C63FF",
       "media": {
-        "cover": "https://huggingface.co/datasets/USER/REPO/resolve/main/media/sample-cover.png",
-        "hero": "https://huggingface.co/datasets/USER/REPO/resolve/main/media/sample-hero.jpg",
-        "trailer": "https://huggingface.co/datasets/USER/REPO/resolve/main/media/sample-trailer.mp4",
+        "cover": "https://huggingface.co/datasets/KULLANICI/DEPO/resolve/main/gorseller/ornek-kapak.png",
+        "hero": "https://huggingface.co/datasets/KULLANICI/DEPO/resolve/main/gorseller/ornek-genis.jpg",
+        "trailer": "https://huggingface.co/datasets/KULLANICI/DEPO/resolve/main/gorseller/ornek-tanitim.mp4",
         "screenshots": []
       },
       "packages": [
         {
-          "id": "sample-base-100",
-          "kind": "game",
-          "label": "Base Game",
+          "id": "ornek-ana-100",
+          "kind": "oyun",
+          "label": "Ana Oyun",
           "version": "1.00",
           "size": 123456789,
-          "url": "https://huggingface.co/datasets/USER/REPO/resolve/main/pkg/sample.pkg",
+          "url": "https://huggingface.co/datasets/KULLANICI/DEPO/resolve/main/paketler/ornek.pkg",
           "sha256": "",
           "minFirmware": "9.00",
           "deleteAfterInstall": false
@@ -78,18 +78,18 @@ PSForcer reads one JSON document. The bundled example is `assets/catalog.json`; 
 }
 ```
 
-## Hugging Face layout suggestion
+## Önerilen Hugging Face düzeni
 
 ```text
 catalog.json
-media/
-  game-id-cover.png
-  game-id-hero.jpg
-  game-id-trailer.mp4
-pkg/
-  game-id-base-1.00.pkg
-  game-id-update-1.01.pkg
-  game-id-dlc-name.pkg
+gorseller/
+  oyun-kimligi-kapak.png
+  oyun-kimligi-genis.jpg
+  oyun-kimligi-tanitim.mp4
+paketler/
+  oyun-kimligi-ana-1.00.pkg
+  oyun-kimligi-guncelleme-1.01.pkg
+  oyun-kimligi-ek-paket-adi.pkg
 ```
 
-Use immutable filenames for published PKGs or update the SHA-256 whenever a file changes.
+Yayınlanan PKG dosyaları için değişmeyen dosya adları kullanın. Bir dosya değişirse SHA-256 değerini de mutlaka güncelleyin.
