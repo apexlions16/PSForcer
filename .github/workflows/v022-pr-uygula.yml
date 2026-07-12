@@ -21,13 +21,15 @@ jobs:
           fetch-depth: 0
 
       - name: Kaynak düzeltmesini uygula
+        shell: bash
         run: |
-          set -euo pipefail
-          python3 tools/v022_apply.py
-          rm -f tools/v022_apply.py
-          rm -f src/HttpClientTurkceV022.tmp
+          set +e
+          python3 tools/v022_apply.py > v022-run.log 2>&1
+          durum=$?
+          set -e
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/HttpClientTurkce.cpp Makefile .github/workflows/build-pkg-release.yml tools/v022_apply.py src/HttpClientTurkceV022.tmp
-          git commit -m 'İndirmeyi tek açık dosya oturumunda sürdür'
+          git add v022-run.log
+          git commit -m 'v0.2.2 uygulama tanısını kaydet' || true
           git push origin "HEAD:${GITHUB_HEAD_REF}"
+          exit "$durum"
