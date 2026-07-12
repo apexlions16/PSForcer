@@ -33,8 +33,6 @@ private:
     int netPoolId_;
     int sslContextId_;
     int httpContextId_;
-    std::string cachedSourceUrl_;
-    std::string cachedResolvedUrl_;
 #endif
 };
 
