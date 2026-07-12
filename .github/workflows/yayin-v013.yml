@@ -1,0 +1,78 @@
+name: Okunaklı arayüz paketini yayınla
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/yayin-v013.yml'
+
+permissions:
+  actions: read
+  contents: write
+
+env:
+  DERLEME_CIKTISI: '8259908914'
+  YAYIN_ETIKETI: v0.1.3
+  GERI_ALINACAK_ETIKET: v0.1.2
+  PAKET_ADI: IV0000-PSFC00001_00-PSFORCERCLIENT00.pkg
+
+jobs:
+  yayinla:
+    name: Doğrulanmış paketi yayınla
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kaynakları al
+        uses: actions/checkout@v4
+
+      - name: Doğrulanmış paketi indir
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${DERLEME_CIKTISI}/zip" > /tmp/psforcer.zip
+          mkdir -p /tmp/psforcer
+          unzip -q /tmp/psforcer.zip -d /tmp/psforcer
+          cp "$(find /tmp/psforcer -type f -name "$PAKET_ADI" -print -quit)" "$PAKET_ADI"
+          cp "$(find /tmp/psforcer -type f -name "$PAKET_ADI.sha256" -print -quit)" "$PAKET_ADI.sha256"
+          test -s "$PAKET_ADI"
+          test -s "$PAKET_ADI.sha256"
+
+      - name: Çalışmayan v0.1.2 sürümünü geri al
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view "$GERI_ALINACAK_ETIKET" >/dev/null 2>&1; then
+            gh release delete "$GERI_ALINACAK_ETIKET" --cleanup-tag --yes
+          fi
+
+      - name: v0.1.3 sürümünü yayınla
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$YAYIN_ETIKETI" \
+            --target "$GITHUB_SHA" \
+            --title 'PSForcer v0.1.3 Okunaklı Arayüz Düzeltmesi' \
+            --notes 'v0.1.2 arayüz değişikliği geri alındı. Bozuk sıkıştırılmış yazı tipi kaldırıldı, temiz 5x7 yazı takımı eklendi, kartlar dört sütunlu daha geniş düzene geçirildi ve menü metinleri ortalandı.'
+          gh release upload "$YAYIN_ETIKETI" "$PAKET_ADI" "$PAKET_ADI.sha256" --clobber
+
+      - name: Yayın kaydını yaz ve geçici akışı kaldır
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          ozet="$(awk '{print $1}' "$PAKET_ADI.sha256")"
+          jq -n \
+            --arg etiket "$YAYIN_ETIKETI" \
+            --arg paket "$PAKET_ADI" \
+            --arg sha256 "$ozet" \
+            '{etiket:$etiket, paket:$paket, sha256:$sha256, durum:"yüklendi", geri_alinan_surum:"v0.1.2"}' \
+            > release/durum.json
+          rm -f .github/workflows/yayin-v013.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'v0.1.3 yayın kaydını yaz ve geçici akışı kaldır [skip ci]'
+          git push
