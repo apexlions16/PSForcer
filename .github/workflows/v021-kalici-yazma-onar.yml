@@ -1,0 +1,456 @@
+name: v0.2.1 kalıcı yazma düzeltmesini uygula
+
+on:
+  push:
+    branches: [duzeltme/kalici-yazma-v021]
+    paths:
+      - '.github/workflows/v021-kalici-yazma-onar.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  onar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Düzeltme dalını al
+        uses: actions/checkout@v4
+        with:
+          ref: duzeltme/kalici-yazma-v021
+          fetch-depth: 0
+
+      - name: İndirmeyi mutlak konuma ve kalıcı diske yaz
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          http = Path('src/HttpClientTurkce.cpp')
+          text = http.read_text()
+          text = text.replace('#include <cstring>\n', '#include <cstring>\n#include <fcntl.h>\n')
+          text = text.replace('#include <orbis/Http.h>\n', '#include <orbis/Http.h>\n#include <orbis/libkernel.h>\n')
+          text = text.replace('const uint64_t kPackageRangeSize = 64ULL * 1024ULL * 1024ULL;\n', '')
+
+          function_pos = text.index('bool HttpClient::download(')
+          block_start = text.index('#if defined(PSFORCER_ORBIS)\n    int templateId = 0;', function_pos)
+          block_end = text.index('#else\n    (void)expectedSize;', block_start)
+
+          new_block = r'''#if defined(PSFORCER_ORBIS)
+    int templateId = 0;
+    int connectionId = 0;
+    int requestId = 0;
+    int outputFd = -1;
+    bool success = false;
+    uint64_t existing = resume ? fileSize(destination) : 0;
+    int32_t statusCode = 0;
+    int contentLengthType = 0;
+    size_t responseLength = 0;
+    uint64_t total = 0;
+    uint64_t downloaded = existing;
+    uint64_t requestedStart = existing;
+    uint64_t responseBytes = 0;
+    uint64_t expectedResponseBytes = 0;
+    uint64_t lastSynced = existing;
+    ContentRangeInfo contentRange;
+    bool rangeRequested = false;
+    std::string currentUrl = url;
+    bool allowToken = true;
+    int redirectCount = 0;
+    int authFallbackCount = 0;
+
+    std::vector<uint8_t> buffer(512 * 1024);
+
+    templateId = sceHttpCreateTemplate(httpContextId_, "PSForcer/0.21",
+                                       ORBIS_HTTP_VERSION_1_1, 1);
+    if (templateId < 0) {
+        error = PSF_SABLON;
+        return false;
+    }
+
+    while (true) {
+        connectionId = sceHttpCreateConnectionWithURL(templateId,
+                                                       currentUrl.c_str(), true);
+        if (connectionId < 0) {
+            error = PSF_BAGLANTI;
+            goto cleanup;
+        }
+
+        requestId = sceHttpCreateRequestWithURL(connectionId, ORBIS_METHOD_GET,
+                                                currentUrl.c_str(), 0);
+        if (requestId < 0) {
+            error = PSF_ISTEK;
+            goto cleanup;
+        }
+
+        psfHttpSetAutoRedirect(requestId, 0);
+        psfHttpSetRecvBlockSize(requestId, 512 * 1024);
+        psfHttpSetRecvTimeOut(requestId, 60 * 1000 * 1000);
+        sceHttpSetResolveTimeOut(requestId, 20 * 1000 * 1000);
+        sceHttpSetConnectTimeOut(requestId, 30 * 1000 * 1000);
+        sceHttpSetSendTimeOut(requestId, 30 * 1000 * 1000);
+
+        sceHttpAddRequestHeader(requestId, "Accept", "application/octet-stream", 0);
+        sceHttpAddRequestHeader(requestId, "Accept-Encoding", "identity", 0);
+        sceHttpAddRequestHeader(requestId, "Connection", "keep-alive", 0);
+
+        bool tokenAdded = false;
+        if (allowToken && isHuggingFaceUrl(currentUrl)) {
+            const std::string token = huggingFaceToken();
+            if (!token.empty()) {
+                const std::string authorization = "Bearer " + token;
+                sceHttpAddRequestHeader(requestId, "Authorization",
+                                        authorization.c_str(), 0);
+                tokenAdded = true;
+            }
+        }
+
+        requestedStart = existing;
+        rangeRequested = false;
+        if (existing > 0) {
+            std::ostringstream range;
+            range << "bytes=" << requestedStart << '-';
+            if (sceHttpAddRequestHeader(requestId, "Range",
+                                        range.str().c_str(), 0) < 0) {
+                error = "Kaldığı yerden devam başlığı eklenemedi; mevcut parça korundu";
+                goto cleanup;
+            }
+            rangeRequested = true;
+        }
+
+        if (sceHttpSendRequest(requestId, NULL, 0) < 0) {
+            error = PSF_GONDER;
+            goto cleanup;
+        }
+
+        if (sceHttpGetStatusCode(requestId, &statusCode) < 0) {
+            error = PSF_DURUM;
+            goto cleanup;
+        }
+
+        if (statusCode == 401 && tokenAdded && authFallbackCount == 0) {
+            ++authFallbackCount;
+            allowToken = false;
+            closeRequestObjects(requestId, connectionId);
+            continue;
+        }
+
+        if (isRedirectStatus(statusCode)) {
+            if (++redirectCount > 8) {
+                error = "İndirme yönlendirme sınırını aştı";
+                goto cleanup;
+            }
+            const std::string location = responseHeaderValue(requestId, "Location");
+            if (location.empty()) {
+                error = "İndirme yönlendirmesinde hedef adres bulunamadı";
+                goto cleanup;
+            }
+            currentUrl = absoluteRedirectUrl(currentUrl, location);
+            closeRequestObjects(requestId, connectionId);
+            continue;
+        }
+        break;
+    }
+
+    if (statusCode == 416 && existing > 0) {
+        success = expectedSize > 0 && existing >= expectedSize;
+        if (!success) {
+            error = "Sunucu kaldığı yerden devam aralığını reddetti (416)";
+        }
+        goto cleanup;
+    }
+
+    if (statusCode != 200 && statusCode != 206) {
+        if (statusCode == 401 && isHuggingFaceUrl(currentUrl)) {
+            error = "Hugging Face erişimi reddetti (401): token geçersiz veya depo erişimi kapalı";
+        } else if (statusCode == 403) {
+            error = "İndirme sunucusu erişimi reddetti (403)";
+        } else {
+            std::ostringstream message;
+            message << "İndirme isteği başarısız oldu; durum kodu: " << statusCode;
+            error = message.str();
+        }
+        goto cleanup;
+    }
+
+    contentRange = parseContentRange(
+        responseHeaderValue(requestId, "Content-Range"));
+
+    if (statusCode == 206 && rangeRequested) {
+        if (!contentRange.valid) {
+            error = "Sunucu geçerli Content-Range bilgisi göndermedi";
+            goto cleanup;
+        }
+        if (contentRange.start != requestedStart) {
+            std::ostringstream message;
+            message << "Sunucu yanlış aralıktan veri gönderdi. Beklenen başlangıç "
+                    << requestedStart << ", gelen " << contentRange.start;
+            error = message.str();
+            goto cleanup;
+        }
+    }
+
+    if (statusCode == 200 && existing > 0) {
+        error = "Sunucu kaldığı yerden devam isteğini yok saydı; mevcut parça korundu";
+        goto cleanup;
+    }
+
+    if (sceHttpGetResponseContentLength(requestId, &contentLengthType,
+                                         &responseLength) >= 0) {
+        expectedResponseBytes = static_cast<uint64_t>(responseLength);
+        total = existing + expectedResponseBytes;
+    }
+    if (contentRange.valid) {
+        expectedResponseBytes = contentRange.end - contentRange.start + 1;
+        if (contentRange.total > 0) total = contentRange.total;
+    }
+    if (expectedSize > 0) total = expectedSize;
+
+    outputFd = sceKernelOpen(destination.c_str(), O_WRONLY | O_CREAT, 0777);
+    if (outputFd < 0) {
+        error = PSF_HEDEF;
+        goto cleanup;
+    }
+    if (!resume && sceKernelFtruncate(outputFd, 0) < 0) {
+        error = "Hedef dosya temizlenemedi";
+        goto cleanup;
+    }
+
+    if (progress) progress(HttpProgress{downloaded, total});
+
+    while (true) {
+        if (cancel && cancel->load()) {
+            error = PSF_IPTAL;
+            sceHttpAbortRequest(requestId);
+            goto cleanup;
+        }
+
+        const int read = sceHttpReadData(requestId, &buffer[0],
+                                         static_cast<uint32_t>(buffer.size()));
+        if (read < 0) {
+            int32_t lastErrno = 0;
+            sceHttpGetLastErrno(requestId, &lastErrno);
+            std::ostringstream message;
+            message << PSF_AG_OKUMA << " (" << lastErrno << ")";
+            error = message.str();
+            goto cleanup;
+        }
+        if (read == 0) {
+            if (expectedResponseBytes > 0 &&
+                responseBytes < expectedResponseBytes) {
+                std::ostringstream message;
+                message << "Bağlantı erken kapandı. Bu istekte beklenen "
+                        << expectedResponseBytes << " bayt, alınan "
+                        << responseBytes << " bayt";
+                error = message.str();
+                goto cleanup;
+            }
+            break;
+        }
+
+        const uint64_t readSize = static_cast<uint64_t>(read);
+        if (expectedResponseBytes > 0 &&
+            responseBytes + readSize > expectedResponseBytes) {
+            error = "Sunucu bildirilen aralıktan fazla veri gönderdi";
+            goto cleanup;
+        }
+        if (expectedSize > 0 && downloaded + readSize > expectedSize) {
+            error = "Sunucu katalogda belirtilen dosya boyutundan fazla veri gönderdi";
+            goto cleanup;
+        }
+
+        size_t offset = 0;
+        while (offset < static_cast<size_t>(read)) {
+            const size_t remaining = static_cast<size_t>(read) - offset;
+            const size_t written = sceKernelPwrite(
+                outputFd, &buffer[offset], remaining,
+                static_cast<off_t>(downloaded + offset));
+            if (written == 0 || written > remaining) {
+                error = "Dosyaya kalıcı yazma başarısız oldu";
+                goto cleanup;
+            }
+            offset += written;
+        }
+
+        downloaded += readSize;
+        responseBytes += readSize;
+
+        // İlerleme yalnızca mutlak konuma yazılmış veri üzerinden hesaplanır.
+        // Her 8 MiB'de diske zorla; bağlantı kopsa bile sayaç geri dönmesin.
+        if (downloaded - lastSynced >= 8ULL * 1024ULL * 1024ULL) {
+            if (sceKernelFsync(outputFd) < 0) {
+                error = "İndirilen veri diske kaydedilemedi";
+                goto cleanup;
+            }
+            const uint64_t persisted = fileSize(destination);
+            if (persisted < downloaded) {
+                std::ostringstream message;
+                message << "Kalıcı dosya boyutu geride kaldı. Yazılan "
+                        << downloaded << " bayt, diskte " << persisted << " bayt";
+                error = message.str();
+                goto cleanup;
+            }
+            lastSynced = downloaded;
+        }
+
+        if (progress) progress(HttpProgress{downloaded, total});
+    }
+
+    if (sceKernelFsync(outputFd) < 0) {
+        error = "İndirilen veri diske kaydedilemedi";
+        goto cleanup;
+    }
+    if (fileSize(destination) < downloaded) {
+        error = "İndirme tamamlandı ancak kalıcı dosya boyutu doğrulanamadı";
+        goto cleanup;
+    }
+
+    success = true;
+
+cleanup:
+    if (outputFd >= 0) {
+        sceKernelFsync(outputFd);
+        sceKernelClose(outputFd);
+        outputFd = -1;
+    }
+
+    {
+        const uint64_t persisted = fileSize(destination);
+        if (downloaded > persisted) {
+            success = false;
+            std::ostringstream message;
+            message << "Dosya yazımı geriye düştü. Bellekte " << downloaded
+                    << " bayt, diskte " << persisted << " bayt";
+            error = message.str();
+        }
+
+        const char* logPath = "/data/psforcer/indirme_tani.log";
+        FILE* log = std::fopen(logPath, fileSize(logPath) > 512 * 1024 ? "wb" : "ab");
+        if (log) {
+            std::fprintf(log,
+                         "baslangic=%llu durum=%d aralik=%llu-%llu yanit=%llu dosya=%llu sonuc=%s hata=%s\n",
+                         static_cast<unsigned long long>(requestedStart),
+                         static_cast<int>(statusCode),
+                         static_cast<unsigned long long>(contentRange.start),
+                         static_cast<unsigned long long>(contentRange.end),
+                         static_cast<unsigned long long>(responseBytes),
+                         static_cast<unsigned long long>(persisted),
+                         success ? "basarili" : "basarisiz",
+                         error.empty() ? "-" : error.c_str());
+            std::fclose(log);
+        }
+    }
+
+    closeRequestObjects(requestId, connectionId);
+    if (templateId > 0) sceHttpDeleteTemplate(templateId);
+    return success;
+'''
+
+          text = text[:block_start] + new_block + text[block_end:]
+          http.write_text(text)
+
+          manager = Path('src/DownloadManager.cpp')
+          text = manager.read_text()
+          text = text.replace(
+              '           message.find("yanlış aralıktan") != std::string::npos;',
+              '           message.find("yanlış aralıktan") != std::string::npos ||\n'
+              '           message.find("kalıcı yazma") != std::string::npos ||\n'
+              '           message.find("dosya yazımı geriye düştü") != std::string::npos;')
+          text = text.replace(
+              '                snapshot_.downloaded = progress.downloaded;',
+              '                snapshot_.downloaded = std::max(snapshot_.downloaded,\n'
+              '                                                progress.downloaded);')
+          old = '''        const uint64_t actualSize = fileSize(request.destination);
+        const bool madeProgress = actualSize > previousSize;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            snapshot_.downloaded = actualSize;
+            if (request.expectedSize > 0) snapshot_.total = request.expectedSize;
+        }
+'''
+          new = '''        const uint64_t actualSize = fileSize(request.destination);
+        if (actualSize < previousSize) {
+            std::ostringstream message;
+            message << "Dosya yazımı geriye düştü. Önceki kalıcı boyut "
+                    << previousSize << " bayt, yeni boyut " << actualSize << " bayt";
+            lastError = message.str();
+            break;
+        }
+        const bool madeProgress = actualSize > previousSize;
+        {
+            std::lock_guard<std::mutex> lock(mutex_);
+            snapshot_.downloaded = std::max(snapshot_.downloaded, actualSize);
+            if (request.expectedSize > 0) snapshot_.total = request.expectedSize;
+        }
+'''
+          if old not in text:
+              raise SystemExit('DownloadManager boyut bloğu bulunamadı')
+          text = text.replace(old, new, 1)
+          manager.write_text(text)
+
+          test = Path('tests/download_manager_test.cpp')
+          text = test.read_text()
+          old_wait = '''psforcer::DownloadSnapshot waitFor(psforcer::DownloadManager& manager) {
+    for (int i = 0; i < 500; ++i) {
+        psforcer::DownloadSnapshot snapshot = manager.snapshot();
+        if (terminal(snapshot.state)) return snapshot;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    return manager.snapshot();
+}
+'''
+          new_wait = '''psforcer::DownloadSnapshot waitFor(psforcer::DownloadManager& manager,
+                                          bool* geriyeSardi = NULL) {
+    uint64_t onceki = 0;
+    for (int i = 0; i < 500; ++i) {
+        psforcer::DownloadSnapshot snapshot = manager.snapshot();
+        if (geriyeSardi && snapshot.downloaded < onceki) *geriyeSardi = true;
+        if (snapshot.downloaded > onceki) onceki = snapshot.downloaded;
+        if (terminal(snapshot.state)) return snapshot;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    return manager.snapshot();
+}
+'''
+          if old_wait not in text:
+              raise SystemExit('Sınama bekleme işlevi bulunamadı')
+          text = text.replace(old_wait, new_wait, 1)
+          text = text.replace(
+              '    psforcer::DownloadSnapshot snapshot = waitFor(manager);',
+              '    bool geriyeSardi = false;\n'
+              '    psforcer::DownloadSnapshot snapshot = waitFor(manager, &geriyeSardi);', 1)
+          text = text.replace(
+              '        psforcer::fileSize(destination) != payload.size()) {',
+              '        psforcer::fileSize(destination) != payload.size() || geriyeSardi) {', 1)
+          test.write_text(text)
+
+          makefile = Path('Makefile')
+          text = makefile.read_text()
+          text = text.replace('v0.20', 'v0.21')
+          text = text.replace('VERSION     := 0.20', 'VERSION     := 0.21')
+          makefile.write_text(text)
+
+          workflow = Path('.github/workflows/build-pkg-release.yml')
+          text = workflow.read_text()
+          text = text.replace('YAYIN_ETIKETI: v0.2.0', 'YAYIN_ETIKETI: v0.2.1')
+          text = text.replace('ESKI_YAYIN_ETIKETI: v0.1.9', 'ESKI_YAYIN_ETIKETI: v0.2.0')
+          text = text.replace('PSForcer v0.2.0 Geri Sarma Koruması',
+                              'PSForcer v0.2.1 Kalıcı İndirme Yazımı')
+          old_note = ('Kaldığı yerden devam isteği HTTP 200 ile yok sayıldığında mevcut .parca dosyası '
+                      'artık asla baştan yazılmaz. Her parça ana Hugging Face adresinden yeniden çözülür; '
+                      'Range ve Content-Range doğrulanır. Böylece 50 MB civarında görülen geri sarma '
+                      'döngüsü engellenir ve mevcut yarım indirme korunur.')
+          new_note = ('İndirilen veri stdio ekleme tamponu yerine mutlak dosya konumuna sceKernelPwrite ile '
+                      'yazılır ve her 8 MiB’de sceKernelFsync ile kalıcılaştırılır. Sabit 64 MiB istek sınırı '
+                      'kaldırılmıştır; erken kapanan bağlantılar gerçek disk boyutundan devam eder. İlerleme '
+                      'sayacı monoton tutulur, dosya boyutu küçülürse döngüye girmek yerine tanı kaydıyla durur.')
+          text = text.replace(old_note, new_note)
+          workflow.write_text(text)
+          PY
+
+          rm -f .github/workflows/v021-kalici-yazma-onar.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'İndirmeyi mutlak konuma kalıcı olarak yaz'
+          git push origin HEAD:duzeltme/kalici-yazma-v021
