@@ -31,6 +31,7 @@ jobs:
           boyut="${api_boyutu:-${aralik_boyutu:-${bagli_boyut:-$icerik_boyutu}}}"
           test -n "$boyut"
           test "$boyut" -gt 0
+          test "${#oid}" -eq 64
 
           gib="$(awk -v b="$boyut" 'BEGIN { printf "%.3f", b / 1024 / 1024 / 1024 }')"
           mib="$(awk -v b="$boyut" 'BEGIN { printf "%.2f", b / 1024 / 1024 }')"
@@ -38,4 +39,19 @@ jobs:
           echo "PT_PAKET_BOYUT_BAYT=$boyut"
           echo "PT_PAKET_BOYUT_MIB=$mib"
           echo "PT_PAKET_BOYUT_GIB=$gib"
-          echo "PT_LFS_OID=$oid"
+
+          jq -n \
+            --arg yol 'PPCH4/CUSA01127-USA.pkg' \
+            --arg url "$url" \
+            --arg sha256 "$oid" \
+            --argjson boyut "$boyut" \
+            --arg mib "$mib" \
+            --arg gib "$gib" \
+            '{yol:$yol,url:$url,boyut:$boyut,mib:$mib,gib:$gib,sha256:$sha256}' \
+            > pt-paket-bilgisi.json
+
+      - name: Paket bilgisini sakla
+        uses: actions/upload-artifact@v4
+        with:
+          name: pt-paket-bilgisi
+          path: pt-paket-bilgisi.json
