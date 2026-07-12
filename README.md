@@ -1,64 +1,70 @@
 # PSForcer
 
-PSForcer is an OpenOrbis-based PlayStation 4 catalog and download client. It presents games in a console-friendly storefront, separates base-game, update, DLC and extra packages, downloads content from manifest-provided URLs, verifies SHA-256 hashes, and hands completed files to an installer adapter.
+PSForcer, OpenOrbis tabanlı bir PlayStation 4 katalog ve indirme istemcisidir. Oyunları konsola uygun bir mağaza görünümünde sunar; ana oyun, güncelleme, ek paket ve ekstra dosyalarını ayırır; katalogda belirtilen bağlantılardan içerik indirir; SHA-256 bütünlüğünü denetler ve tamamlanan dosyayı kurucu uyarlayıcısına teslim eder.
 
-> The repository does not contain an exploit, jailbreak, Sony SDK material, proprietary runtime modules, or code that bypasses platform security. The included installer adapter marks a verified package as ready for manual/authorized installation. Automatic installation can only be connected to an installer API that is legitimately available in the target environment.
+> Bu depo; açık, güvenlik açığı, jailbreak aracı, Sony SDK içeriği, kapalı kaynak çalışma modülü veya platform güvenliğini aşan kod içermez. Yerleşik kurucu uyarlayıcısı, doğrulanmış paketi elle ya da yetkili yöntemle kurulmaya hazır olarak işaretler. Otomatik kurulum yalnızca hedef ortamda meşru biçimde kullanılabilen bir kurucu arayüzüne bağlanabilir.
 
-## Current milestone
+## Güncel aşama
 
-- 1920x1080 SDL2 storefront UI with browse and detail screens
-- Base game / update / DLC / extra package grouping
-- Local cover and hero artwork, plus remote media URL fields
-- JSON catalog loaded from the package or refreshed from a remote manifest
-- Background HTTP(S) downloads with resume support
-- SHA-256 verification before install handoff
-- Delete-after-install policy, triggered only after an installer returns `Installed`
-- Hugging Face-ready manifest schema
+- 1920×1080 çözünürlüklü SDL2 mağaza arayüzü
+- Liste ve ayrıntı ekranları
+- Ana oyun, güncelleme, ek paket ve ekstra gruplaması
+- Yerel kapak ve geniş görsel alanları
+- Uzak görsel ve video bağlantısı alanları
+- Paket içinden yüklenen veya uzaktan yenilenen JSON kataloğu
+- Sürdürülebilir arka plan HTTP(S) indirmeleri
+- Kurucuya teslimden önce SHA-256 bütünlük denetimi
+- Yalnızca kurucu başarı bildirdikten sonra çalışan kurulum sonrası silme seçeneği
+- Hugging Face kullanımına hazır katalog yapısı
 
-## Controls
+## Denetimler
 
-| Control | Action |
+| Düğme | İşlem |
 |---|---|
-| D-pad | Navigate |
-| L1 / R1 | Change catalog filter |
-| Cross | Open game details |
-| Circle | Go back |
-| Square | Download selected package |
-| Triangle | Refresh remote catalog |
-| Options | Exit |
+| Yön düğmeleri | Gezinme |
+| L1 / R1 | Katalog filtresini değiştirme |
+| Çarpı | Oyun ayrıntılarını açma |
+| Daire | Geri dönme |
+| Kare | Seçili paketi indirme |
+| Üçgen | Uzak kataloğu yenileme |
+| Seçenekler | Çıkış |
 
-## Build with OpenOrbis
+## OpenOrbis ile derleme
 
-1. Install the OpenOrbis PS4 Toolchain and set `OO_PS4_TOOLCHAIN`.
-2. Run `make bootstrap` once. This copies the package runtime modules and `right.sprx` from the local OpenOrbis SDL2 sample. These binaries are intentionally not committed.
-3. Run `make`. The package icon is generated from source automatically.
-4. Install the generated PKG using the authorized installation method available on your test environment.
+1. OpenOrbis PS4 Araç Zinciri'ni kurun ve `OO_PS4_TOOLCHAIN` değişkenini ayarlayın.
+2. Bir kez `make bootstrap` çalıştırın. Bu işlem, paket çalışma modüllerini ve `right.sprx` dosyasını yerel OpenOrbis SDL2 örneğinden kopyalar. Bu ikili dosyalar bilerek depoya eklenmez.
+3. `make` çalıştırın. Paket simgesi kaynak koddan otomatik oluşturulur.
+4. Üretilen PKG dosyasını sınama ortamınızda bulunan yetkili yöntemle kurun.
 
 ```sh
-export OO_PS4_TOOLCHAIN=/path/to/OpenOrbis-PS4-Toolchain
+export OO_PS4_TOOLCHAIN=/OpenOrbis-PS4-Toolchain/yolu
 make bootstrap
 make
 ```
 
-The generated package is named `IV0000-PSFC00001_00-PSFORCERCLIENT00.pkg`.
-
-## Configure a remote catalog
-
-Create this text file on the console:
+Üretilen paket adı:
 
 ```text
-/data/psforcer/manifest_url.txt
+IV0000-PSFC00001_00-PSFORCERCLIENT00.pkg
 ```
 
-Put a single HTTPS URL in it. A bundled empty template is also available at `assets/manifest_url.txt`. Press Triangle in PSForcer to download the manifest to `/data/psforcer/catalog.json` and reload the catalog.
+## Uzak katalog ayarı
 
-Hugging Face links will be added later. Prefer a stable `resolve/main/catalog.json` URL. Package objects can independently point to base game, update, DLC and extra PKGs.
+Konsolda şu metin dosyasını oluşturun:
 
-See [docs/MANIFEST.md](docs/MANIFEST.md) for the schema.
+```text
+/data/psforcer/katalog_adresi.txt
+```
 
-## Host-side validation
+Dosyaya tek bir HTTPS bağlantısı yazın. Paket içinde boş bir örnek dosya da bulunur. PSForcer içinde Üçgen düğmesine basıldığında katalog `/data/psforcer/katalog.json` konumuna indirilir ve yeniden yüklenir.
 
-The catalog parser and SHA-256 implementation are platform-independent:
+Hugging Face bağlantıları daha sonra eklenecektir. Sabit bir `resolve/main/catalog.json` bağlantısı kullanılması önerilir. Her paket kaydı ana oyun, güncelleme, ek paket veya ekstra PKG dosyasına ayrı ayrı bağlanabilir.
+
+Katalog yapısı için [docs/MANIFEST.md](docs/MANIFEST.md) belgesine bakın.
+
+## Bilgisayarda doğrulama
+
+Katalog çözümleyicisi ve SHA-256 uygulaması platformdan bağımsızdır:
 
 ```sh
 cmake -S . -B build
@@ -67,6 +73,6 @@ ctest --test-dir build --output-on-failure
 python3 tools/validate_catalog.py assets/catalog.json
 ```
 
-## Project status
+## Proje durumu
 
-This is the first functional storefront milestone. Remote cover caching and video playback are represented in the data model but are not yet connected to a media player. The package downloader and verification path are implemented; installation remains behind the explicit `Installer` interface.
+Bu sürüm çalışan ilk mağaza aşamasıdır. Uzak kapak önbelleği ve video oynatma veri modelinde bulunur ancak henüz oynatıcıya bağlanmamıştır. Paket indirme ve bütünlük denetimi çalışır; kurulum işlemi açıkça ayrılmış kurucu arayüzünün arkasındadır.
