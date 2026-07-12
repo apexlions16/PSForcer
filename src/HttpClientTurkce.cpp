@@ -31,7 +31,9 @@ bool isHuggingFaceUrl(const std::string& url) {
 }
 
 std::string huggingFaceToken() {
-    return trim(readFirstLine("/data/psforcer/hf_token.txt"));
+    const std::string token = trim(readFirstLine("/data/psforcer/hf_token.txt"));
+    if (token.empty() || token[0] == '#') return std::string();
+    return token;
 }
 }
 #endif
@@ -142,7 +144,7 @@ bool HttpClient::download(const std::string& url, const std::string& destination
 
     std::vector<uint8_t> buffer(64 * 1024);
 
-    templateId = sceHttpCreateTemplate(httpContextId_, "PSForcer/0.16", ORBIS_HTTP_VERSION_1_1, 1);
+    templateId = sceHttpCreateTemplate(httpContextId_, "PSForcer/0.17", ORBIS_HTTP_VERSION_1_1, 1);
     if (templateId < 0) {
         error = PSF_SABLON;
         return false;
