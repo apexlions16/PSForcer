@@ -1,0 +1,162 @@
+name: PS4 paketini derle ve yayınla
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-pkg-release.yml'
+      - 'Makefile'
+      - 'src/**'
+      - 'assets/**'
+      - 'tools/**'
+      - 'sce_sys/**'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ps4-paketi-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  YAYIN_ETIKETI: v0.1.2
+  ESKI_YAYIN_ETIKETI: v0.1.1
+  PAKET_ADI: IV0000-PSFC00001_00-PSFORCERCLIENT00.pkg
+
+jobs:
+  paket-derleme:
+    name: Paketi derle
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+      - name: PSForcer kaynaklarını al
+        uses: actions/checkout@v4
+
+      - name: Derleme bağımlılıklarını kur
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip jq file libncurses5
+
+      - name: Uyumlu LLVM 18 araç zincirini kur
+        uses: gentoo-root/install-llvm-action@abb6cec0ec431e834bc5e5090ea39a2d1d63a4c6
+        with:
+          version: '18'
+          directory: ${{ runner.tool_cache }}/llvm
+          cached: false
+
+      - name: Derleyici sürümlerini doğrula
+        run: |
+          clang --version
+          clang++ --version
+          ld.lld --version
+
+      - name: OpenOrbis yayın araç zincirini indir
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/openorbis/varliklar" "$RUNNER_TEMP/openorbis/acilan"
+
+          gh api repos/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/latest \
+            --jq '.assets[] | [.name, .browser_download_url] | @tsv' \
+            > "$RUNNER_TEMP/openorbis/varliklar.tsv"
+
+          echo 'Kullanılabilir OpenOrbis yayın dosyaları:'
+          cat "$RUNNER_TEMP/openorbis/varliklar.tsv"
+
+          arsiv_bulundu=0
+          while IFS=$'\t' read -r ad adres; do
+            case "$ad" in
+              *llvm-18*.tar.gz|*llvm-18*.tgz|*llvm-18*.zip)
+                arsiv_bulundu=1
+                hedef="$RUNNER_TEMP/openorbis/varliklar/$ad"
+                echo "İndiriliyor: $ad"
+                curl --fail --location --retry 3 --output "$hedef" "$adres"
+                cikti="$RUNNER_TEMP/openorbis/acilan/${ad//[^A-Za-z0-9_.-]/_}"
+                mkdir -p "$cikti"
+                case "$ad" in
+                  *.zip) unzip -q "$hedef" -d "$cikti" ;;
+                  *.tar.gz|*.tgz) tar -xzf "$hedef" -C "$cikti" ;;
+                esac
+                ;;
+            esac
+          done < "$RUNNER_TEMP/openorbis/varliklar.tsv"
+
+          test "$arsiv_bulundu" -eq 1 || {
+            echo 'LLVM 18 OpenOrbis yayın arşivi bulunamadı.' >&2
+            exit 1
+          }
+
+          paket_araci="$(find "$RUNNER_TEMP/openorbis/acilan" -type f -path '*/bin/linux/PkgTool.Core' -print -quit)"
+          test -n "$paket_araci" || {
+            echo 'İndirilen yayın dosyasında bin/linux/PkgTool.Core bulunamadı.' >&2
+            find "$RUNNER_TEMP/openorbis/acilan" -maxdepth 4 -type f | head -200
+            exit 1
+          }
+
+          arac_zinciri="$(cd "$(dirname "$paket_araci")/../.." && pwd)"
+          test -f "$arac_zinciri/include/orbis/libkernel.h"
+          test -d "$arac_zinciri/lib"
+          chmod +x "$arac_zinciri/bin/linux/"* || true
+
+          echo "OO_PS4_TOOLCHAIN=$arac_zinciri" >> "$GITHUB_ENV"
+          echo "OpenOrbis araç zinciri kökü: $arac_zinciri"
+
+      - name: Çalışma dosyalarını hazırla
+        run: make bootstrap
+
+      - name: PS4 paketini derle
+        shell: bash
+        run: |
+          set +e
+          make clean
+          make -j2 2>&1 | tee openorbis-derleme.log
+          derleme_durumu=${PIPESTATUS[0]}
+          echo '--- son derleme günlüğü ---'
+          tail -n 160 openorbis-derleme.log || true
+          if [ "$derleme_durumu" -ne 0 ]; then
+            exit "$derleme_durumu"
+          fi
+          test -s "$PAKET_ADI"
+          sha256sum "$PAKET_ADI" | tee "$PAKET_ADI.sha256"
+
+      - name: Derleme çıktılarını sakla
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PSForcer-OpenOrbis-derlemesi
+          path: |
+            openorbis-derleme.log
+            ${{ env.PAKET_ADI }}
+            ${{ env.PAKET_ADI }}.sha256
+          if-no-files-found: warn
+
+      - name: Eski yayını kaldır
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view "$ESKI_YAYIN_ETIKETI" >/dev/null 2>&1; then
+            gh release delete "$ESKI_YAYIN_ETIKETI" --cleanup-tag --yes
+          fi
+
+      - name: Yeni GitHub yayınını oluştur
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "$YAYIN_ETIKETI" >/dev/null 2>&1; then
+            gh release create "$YAYIN_ETIKETI" \
+              --target "$GITHUB_SHA" \
+              --title 'PSForcer v0.1.2 Türkçe Arayüz Düzeltmesi' \
+              --notes 'Yazı taşmaları giderildi. Arayüz, hata iletileri, katalog örnekleri, belgeler ve iş akışları Türkçeleştirildi. Uygulama simgesi değiştirilmedi.'
+          fi
+          gh release upload "$YAYIN_ETIKETI" \
+            "$PAKET_ADI" "$PAKET_ADI.sha256" \
+            --clobber

@@ -1,0 +1,21 @@
+name: Katalog çekirdeğini doğrula
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  sinama:
+    name: Sınama
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kaynakları al
+        uses: actions/checkout@v4
+      - name: Yapılandır
+        run: cmake -S . -B build
+      - name: Derle
+        run: cmake --build build --parallel
+      - name: Sınamaları çalıştır
+        run: ctest --test-dir build --output-on-failure
+      - name: Yerleşik kataloğu doğrula
+        run: python3 tools/validate_catalog.py assets/catalog.json

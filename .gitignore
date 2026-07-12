@@ -1,0 +1,19 @@
+# OpenOrbis derleme çıktıları
+build/
+x64/
+eboot.bin
+pkg.gp4
+*.pkg
+sce_sys/param.sfo
+
+# Çalışma ve sınama çıktıları
+data/
+*.part
+*.ready
+*.parca
+*.hazir
+
+# Düzenleyici ve işletim sistemi dosyaları
+.DS_Store
+.vscode/
+.idea/

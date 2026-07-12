@@ -1,0 +1,140 @@
+#include "App.h"
+#include "FileUtil.h"
+
+#include <cstdio>
+
+namespace psforcer {
+
+namespace {
+bool sonDurum(DownloadState state) {
+    return state == DownloadState::Completed || state == DownloadState::Failed || state == DownloadState::Cancelled;
+}
+}
+
+void App::startPackageDownload() {
+    if (downloads_.busy() || visible_.empty()) {
+        if (downloads_.busy()) setToast("Bir indirme zaten çalışıyor");
+        return;
+    }
+    const size_t itemIndex = visible_[selectedVisible_];
+    const CatalogItem& item = catalog_.items[itemIndex];
+    if (item.packages.empty() || selectedPackage_ >= item.packages.size()) return;
+    const PackageInfo& package = item.packages[selectedPackage_];
+    if (package.url.empty()) {
+        setToast("Bu örnek paket için henüz bağlantı eklenmedi");
+        return;
+    }
+
+    const std::string baseName = sanitizeFileName(item.id + "-" + package.id + "-" + package.version + ".pkg");
+    pendingFinalPath_ = runtimeRoot() + "/indirmeler/" + baseName;
+    DownloadRequest request;
+    request.jobId = nextJobId_++;
+    request.id = package.id;
+    request.label = item.title + " - " + package.label;
+    request.url = package.url;
+    request.destination = pendingFinalPath_ + ".parca";
+    request.sha256 = package.sha256;
+    request.resume = true;
+
+    std::string error;
+    if (!downloads_.start(request, error)) {
+        setToast(error);
+        return;
+    }
+    pendingCatalog_ = false;
+    pendingItemIndex_ = itemIndex;
+    pendingPackageIndex_ = selectedPackage_;
+    status_ = "İndirme başlatıldı";
+}
+
+void App::refreshCatalog() {
+    if (downloads_.busy()) {
+        setToast("Kataloğu yenilemeden önce mevcut indirmenin bitmesini bekleyin");
+        return;
+    }
+    std::string url = readFirstLine(runtimeRoot() + "/katalog_adresi.txt");
+    if (url.empty()) url = readFirstLine(bundledPath("assets/katalog_adresi.txt"));
+    if (url.empty()) {
+        setToast("/data/psforcer/katalog_adresi.txt dosyasına katalog bağlantısını yazın", 6500);
+        return;
+    }
+    DownloadRequest request;
+    request.jobId = nextJobId_++;
+    request.id = "katalog-yenileme";
+    request.label = "Katalog yenileniyor";
+    request.url = url;
+    request.destination = runtimeRoot() + "/katalog.json.parca";
+    request.resume = false;
+
+    std::string error;
+    if (!downloads_.start(request, error)) {
+        setToast(error);
+        return;
+    }
+    pendingCatalog_ = true;
+    pendingFinalPath_ = runtimeRoot() + "/katalog.json";
+    status_ = "Katalog indiriliyor";
+}
+
+void App::processDownloadCompletion() {
+    const DownloadSnapshot snapshot = downloads_.snapshot();
+    if (!sonDurum(snapshot.state) || snapshot.jobId == 0 || snapshot.jobId == lastHandledJobId_) return;
+    lastHandledJobId_ = snapshot.jobId;
+
+    if (snapshot.state == DownloadState::Failed || snapshot.state == DownloadState::Cancelled) {
+        status_ = snapshot.state == DownloadState::Cancelled ? "İndirme iptal edildi" : "İndirme başarısız";
+        setToast(snapshot.error.empty() ? status_ : snapshot.error, 6000);
+        downloads_.reset();
+        return;
+    }
+
+    if (pendingCatalog_) {
+        std::remove(pendingFinalPath_.c_str());
+        if (std::rename(snapshot.destination.c_str(), pendingFinalPath_.c_str()) != 0) {
+            setToast("Katalog dosyası etkinleştirilemedi");
+            downloads_.reset();
+            return;
+        }
+        std::string error;
+        if (loadCatalog(error)) {
+            selectedVisible_ = 0;
+            selectedPackage_ = 0;
+            rebuildVisible();
+            setToast("Katalog yenilendi");
+            status_ = "Katalog güncel";
+        } else {
+            setToast("Yeni katalog geçersiz: " + error, 7000);
+        }
+        downloads_.reset();
+        return;
+    }
+
+    std::remove(pendingFinalPath_.c_str());
+    if (std::rename(snapshot.destination.c_str(), pendingFinalPath_.c_str()) != 0) {
+        setToast("Doğrulanan paket yeniden adlandırılamadı");
+        downloads_.reset();
+        return;
+    }
+    if (pendingItemIndex_ >= catalog_.items.size() ||
+        pendingPackageIndex_ >= catalog_.items[pendingItemIndex_].packages.size()) {
+        setToast("İndirme katalog kaydıyla eşleştirilemedi");
+        downloads_.reset();
+        return;
+    }
+
+    const CatalogItem& item = catalog_.items[pendingItemIndex_];
+    const PackageInfo& package = item.packages[pendingPackageIndex_];
+    const InstallOutcome outcome = installer_->requestInstall(item, package, pendingFinalPath_);
+    if (outcome.result == InstallResult::Installed && package.deleteAfterInstall) {
+        std::remove(pendingFinalPath_.c_str());
+        status_ = "Kuruldu ve paket silindi";
+    } else if (outcome.result == InstallResult::ReadyForManualInstall) {
+        status_ = "Paket kurulum için hazır";
+    } else {
+        status_ = "Kurulum teslimi başarısız";
+    }
+    setToast(outcome.message, 6500);
+    downloads_.reset();
+}
+
+}  // namespace psforcer

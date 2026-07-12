@@ -1,0 +1,146 @@
+{
+  "schemaVersion": 1,
+  "catalogTitle": "PSForcer İçerik Kütüphanesi",
+  "updatedAt": "2026-07-12T00:00:00Z",
+  "items": [
+    {
+      "id": "neon-ufuk",
+      "title": "Neon Ufuk",
+      "developer": "Zirve Tanıtım Stüdyosu",
+      "genre": "Aksiyon",
+      "description": "PSForcer katalog düzenini, paket gruplarını ve görsel alanlarını göstermek için hazırlanmış hızlı bir bilim kurgu aksiyon örneği. Hugging Face dosyaları hazır olduğunda örnek adresleri gerçek bağlantılarla değiştirin.",
+      "releaseYear": 2026,
+      "accent": "6C63FF",
+      "media": {
+        "cover": "",
+        "hero": "",
+        "trailer": "",
+        "screenshots": []
+      },
+      "packages": [
+        {
+          "id": "ana-100",
+          "kind": "oyun",
+          "label": "Ana Oyun",
+          "version": "1.00",
+          "size": 2147483648,
+          "url": "",
+          "sha256": "",
+          "minFirmware": "9.00",
+          "deleteAfterInstall": false
+        },
+        {
+          "id": "guncelleme-110",
+          "kind": "guncelleme",
+          "label": "Güncelleme 1.10",
+          "version": "1.10",
+          "size": 536870912,
+          "url": "",
+          "sha256": "",
+          "minFirmware": "9.00",
+          "deleteAfterInstall": false
+        },
+        {
+          "id": "muzik-albumu",
+          "kind": "ekstra",
+          "label": "Dijital Müzik Albümü",
+          "version": "1.00",
+          "size": 157286400,
+          "url": "",
+          "sha256": "",
+          "minFirmware": "",
+          "deleteAfterInstall": false
+        }
+      ]
+    },
+    {
+      "id": "kul-sirti",
+      "title": "Kül Sırtı",
+      "developer": "Kuzey Çizgisi Etkileşim",
+      "genre": "Macera",
+      "description": "Uzak bir dağ yerleşimini keşfedin, geçmişini ortaya çıkarın ve büyüyen öykü ek paketlerini yönetin. Bu örnek, ek paket gruplamasını ve geniş kapak alanını gösterir.",
+      "releaseYear": 2025,
+      "accent": "E07A5F",
+      "media": {
+        "cover": "",
+        "hero": "",
+        "trailer": "",
+        "screenshots": []
+      },
+      "packages": [
+        {
+          "id": "ana-100",
+          "kind": "oyun",
+          "label": "Ana Oyun",
+          "version": "1.00",
+          "size": 4294967296,
+          "url": "",
+          "sha256": "",
+          "minFirmware": "9.00",
+          "deleteAfterInstall": false
+        },
+        {
+          "id": "gizli-vadi",
+          "kind": "ek-paket",
+          "label": "Gizli Vadi Ek Paketi",
+          "version": "1.00",
+          "size": 805306368,
+          "url": "",
+          "sha256": "",
+          "minFirmware": "9.00",
+          "deleteAfterInstall": false
+        }
+      ]
+    },
+    {
+      "id": "hiz-izgarasi",
+      "title": "Hız Izgarası",
+      "developer": "Nabız Atölyesi",
+      "genre": "Yarış",
+      "description": "Ana oyun, başarım güncellemesi ve ek araç paketi içeren sade bir yarış kataloğu örneği. Paket seçimini ve kategori filtrelerini denemek için kullanılır.",
+      "releaseYear": 2026,
+      "accent": "2A9D8F",
+      "media": {
+        "cover": "",
+        "hero": "",
+        "trailer": "",
+        "screenshots": []
+      },
+      "packages": [
+        {
+          "id": "ana-100",
+          "kind": "oyun",
+          "label": "Ana Oyun",
+          "version": "1.00",
+          "size": 3221225472,
+          "url": "",
+          "sha256": "",
+          "minFirmware": "9.00",
+          "deleteAfterInstall": false
+        },
+        {
+          "id": "guncelleme-102",
+          "kind": "guncelleme",
+          "label": "Başarım Güncellemesi",
+          "version": "1.02",
+          "size": 268435456,
+          "url": "",
+          "sha256": "",
+          "minFirmware": "9.00",
+          "deleteAfterInstall": false
+        },
+        {
+          "id": "ek-araclar",
+          "kind": "ek-paket",
+          "label": "Ek Araç Paketi",
+          "version": "1.00",
+          "size": 104857600,
+          "url": "",
+          "sha256": "",
+          "minFirmware": "9.00",
+          "deleteAfterInstall": false
+        }
+      ]
+    }
+  ]
+}
