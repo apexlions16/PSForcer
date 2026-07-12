@@ -1,0 +1,66 @@
+name: P.T. medya dosyalarını hazırla
+
+on:
+  push:
+    branches: [duzeltme/401-gorseller-header-v016]
+    paths:
+      - '.github/workflows/pt-medya-hazirla.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  hazirla:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: duzeltme/401-gorseller-header-v016
+          fetch-depth: 0
+
+      - name: Görselleri indir ve JPEG biçimine getir
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y imagemagick
+          mkdir -p assets/media/pt /tmp/pt-medya
+
+          curl --fail --location --retry 4 --retry-all-errors \
+            --user-agent 'Mozilla/5.0 PSForcer-Media-Sync/1.0' \
+            'https://cdn.mos.cms.futurecdn.net/dN5pYMUVGmwoATyNUojQF3.jpg' \
+            -o /tmp/pt-medya/hero.jpg
+
+          curl --fail --location --retry 4 --retry-all-errors \
+            --user-agent 'Mozilla/5.0 PSForcer-Media-Sync/1.0' \
+            'https://jryanmvg.wordpress.com/wp-content/uploads/2015/11/14-pt-silent-hill-ps4-3.jpg?w=816' \
+            -o /tmp/pt-medya/shot1.jpg || cp /tmp/pt-medya/hero.jpg /tmp/pt-medya/shot1.jpg
+
+          curl --fail --location --retry 4 --retry-all-errors \
+            --user-agent 'Mozilla/5.0 PSForcer-Media-Sync/1.0' \
+            'https://www.digitaltrends.com/tachyon/2022/07/p.t..jpg?resize=1200%2C720' \
+            -o /tmp/pt-medya/shot2.jpg || cp /tmp/pt-medya/hero.jpg /tmp/pt-medya/shot2.jpg
+
+          curl --fail --location --retry 4 --retry-all-errors \
+            --user-agent 'Mozilla/5.0 PSForcer-Media-Sync/1.0' \
+            'https://areajugones.sport.es/wp-content/uploads/2020/03/silent-hills-PT-1560x880.jpg.webp' \
+            -o /tmp/pt-medya/shot3.webp || cp /tmp/pt-medya/hero.jpg /tmp/pt-medya/shot3.webp
+
+          magick /tmp/pt-medya/hero.jpg -auto-orient -resize '1920x720^' -gravity center -extent 1920x720 -strip -quality 86 assets/media/pt/header.jpg
+          magick /tmp/pt-medya/hero.jpg -auto-orient -resize '840x470^' -gravity center -extent 840x470 -strip -quality 86 assets/media/pt/cover.jpg
+          magick /tmp/pt-medya/shot1.jpg -auto-orient -resize '720x405^' -gravity center -extent 720x405 -strip -quality 84 assets/media/pt/screenshot-1.jpg
+          magick /tmp/pt-medya/shot2.jpg -auto-orient -resize '720x405^' -gravity center -extent 720x405 -strip -quality 84 assets/media/pt/screenshot-2.jpg
+          magick /tmp/pt-medya/shot3.webp -auto-orient -resize '720x405^' -gravity center -extent 720x405 -strip -quality 84 assets/media/pt/screenshot-3.jpg
+
+          identify assets/media/pt/*.jpg
+
+      - name: Medyayı dala yaz ve geçici iş akışını kaldır
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/pt-medya-hazirla.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add assets/media/pt .github/workflows/pt-medya-hazirla.yml
+          git commit -m 'P.T. katalog görsellerini yerel depoya ekle'
+          git push origin HEAD:duzeltme/401-gorseller-header-v016
