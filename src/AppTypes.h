@@ -27,10 +27,10 @@ enum class PackageKind {
 inline const char* packageKindName(PackageKind kind) {
     switch (kind) {
         case PackageKind::Game: return "OYUN";
-        case PackageKind::Update: return "UPDATE";
-        case PackageKind::Dlc: return "DLC";
+        case PackageKind::Update: return "GÜNCELLEME";
+        case PackageKind::Dlc: return "EK PAKET";
         case PackageKind::Extra: return "EKSTRA";
-        default: return "DIGER";
+        default: return "DİĞER";
     }
 }
 
