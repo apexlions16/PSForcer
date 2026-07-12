@@ -64,7 +64,7 @@ bool HttpClient::initialize(std::string& error) {
 void HttpClient::shutdown() {
 #if defined(PSFORCER_ORBIS)
     if (httpContextId_ > 0) sceHttpTerm(httpContextId_);
-    if (sslContextId_ > 0) sceSslTerm(sslContextId_);
+    if (sslContextId_ > 0) sceSslTerm();
     if (netPoolId_ > 0) sceNetPoolDestroy(netPoolId_);
     httpContextId_ = 0;
     sslContextId_ = 0;

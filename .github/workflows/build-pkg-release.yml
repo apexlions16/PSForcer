@@ -1,0 +1,150 @@
+name: Build PS4 PKG and Release
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-pkg-release.yml'
+      - 'Makefile'
+      - 'src/**'
+      - 'assets/**'
+      - 'tools/**'
+      - 'sce_sys/**'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ps4-pkg-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  RELEASE_TAG: v0.1.0
+  PKG_NAME: IV0000-PSFC00001_00-PSFORCERCLIENT00.pkg
+
+jobs:
+  build-pkg:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout PSForcer
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip jq file libncurses5
+
+      - name: Install matching LLVM 18 toolchain
+        uses: gentoo-root/install-llvm-action@abb6cec0ec431e834bc5e5090ea39a2d1d63a4c6
+        with:
+          version: '18'
+          directory: ${{ runner.tool_cache }}/llvm
+          cached: false
+
+      - name: Verify compiler versions
+        run: |
+          clang --version
+          clang++ --version
+          ld.lld --version
+
+      - name: Download OpenOrbis release toolchain
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/openorbis/assets" "$RUNNER_TEMP/openorbis/extracted"
+
+          gh api repos/OpenOrbis/OpenOrbis-PS4-Toolchain/releases/latest \
+            --jq '.assets[] | [.name, .browser_download_url] | @tsv' \
+            > "$RUNNER_TEMP/openorbis/assets.tsv"
+
+          echo 'Available OpenOrbis release assets:'
+          cat "$RUNNER_TEMP/openorbis/assets.tsv"
+
+          found_archive=0
+          while IFS=$'\t' read -r name url; do
+            case "$name" in
+              *llvm-18*.tar.gz|*llvm-18*.tgz|*llvm-18*.zip)
+                found_archive=1
+                destination="$RUNNER_TEMP/openorbis/assets/$name"
+                echo "Downloading $name"
+                curl --fail --location --retry 3 --output "$destination" "$url"
+                output="$RUNNER_TEMP/openorbis/extracted/${name//[^A-Za-z0-9_.-]/_}"
+                mkdir -p "$output"
+                case "$name" in
+                  *.zip) unzip -q "$destination" -d "$output" ;;
+                  *.tar.gz|*.tgz) tar -xzf "$destination" -C "$output" ;;
+                esac
+                ;;
+            esac
+          done < "$RUNNER_TEMP/openorbis/assets.tsv"
+
+          test "$found_archive" -eq 1 || {
+            echo 'No LLVM 18 OpenOrbis release archive was found.' >&2
+            exit 1
+          }
+
+          pkg_tool="$(find "$RUNNER_TEMP/openorbis/extracted" -type f -path '*/bin/linux/PkgTool.Core' -print -quit)"
+          test -n "$pkg_tool" || {
+            echo 'The downloaded release asset does not contain bin/linux/PkgTool.Core.' >&2
+            find "$RUNNER_TEMP/openorbis/extracted" -maxdepth 4 -type f | head -200
+            exit 1
+          }
+
+          toolchain="$(cd "$(dirname "$pkg_tool")/../.." && pwd)"
+          test -f "$toolchain/include/orbis/libkernel.h"
+          test -d "$toolchain/lib"
+          chmod +x "$toolchain/bin/linux/"* || true
+
+          echo "OO_PS4_TOOLCHAIN=$toolchain" >> "$GITHUB_ENV"
+          echo "OpenOrbis toolchain root: $toolchain"
+
+      - name: Bootstrap runtime files
+        run: make bootstrap
+
+      - name: Build PS4 PKG
+        shell: bash
+        run: |
+          set +e
+          make clean
+          make -j2 2>&1 | tee openorbis-build.log
+          build_status=${PIPESTATUS[0]}
+          echo '--- final build log ---'
+          tail -n 160 openorbis-build.log || true
+          if [ "$build_status" -ne 0 ]; then
+            exit "$build_status"
+          fi
+          test -s "$PKG_NAME"
+          sha256sum "$PKG_NAME" | tee "$PKG_NAME.sha256"
+
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PSForcer-openorbis-build
+          path: |
+            openorbis-build.log
+            ${{ env.PKG_NAME }}
+            ${{ env.PKG_NAME }}.sha256
+          if-no-files-found: warn
+
+      - name: Publish GitHub Release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" \
+              --target "$GITHUB_SHA" \
+              --title 'PSForcer v0.1.0' \
+              --notes 'İlk PSForcer test sürümü. OpenOrbis ile üretilmiş PS4 homebrew PKG dosyasını içerir.'
+          fi
+          gh release upload "$RELEASE_TAG" \
+            "$PKG_NAME" "$PKG_NAME.sha256" \
+            --clobber
