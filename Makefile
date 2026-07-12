@@ -1,6 +1,6 @@
-# PSForcer OpenOrbis paket bilgileri
+# PSForcer OpenOrbis paket bilgileri - v0.18
 TITLE       := PSForcer
-VERSION     := 0.17
+VERSION     := 0.18
 TITLE_ID    := PSFC00001
 CONTENT_ID  := IV0000-PSFC00001_00-PSFORCERCLIENT00
 
@@ -10,8 +10,9 @@ EXTRAFLAGS  := -std=gnu++11 -D_GNU_SOURCE -DPSFORCER_ORBIS=1
 TOOLCHAIN   := $(OO_PS4_TOOLCHAIN)
 PROJDIR     := src
 INTDIR      := x64/Debug
-MEDIA_FLAT  := assets/pt-cover.jpg assets/pt-header.jpg assets/pt-screenshot-1.jpg assets/pt-screenshot-2.jpg assets/pt-screenshot-3.jpg
-ASSETS      := assets/catalog.json assets/katalog_adresi.txt assets/hf_token.txt $(MEDIA_FLAT)
+ROOT_ASSETS := assets/catalog.json assets/hf_token.txt assets/katalog_adresi.txt
+PACKAGE_MEDIA := assets/pt-cover.jpg assets/pt-header.jpg assets/pt-screenshot-1.jpg assets/pt-screenshot-2.jpg assets/pt-screenshot-3.jpg
+ASSETS      := $(ROOT_ASSETS) $(PACKAGE_MEDIA)
 LIBMODULES  := $(wildcard sce_module/*)
 CPPFILES    := $(shell find $(PROJDIR) -name '*.cpp')
 OBJS        := $(patsubst $(PROJDIR)/%.cpp,$(INTDIR)/%.o,$(CPPFILES))
@@ -51,7 +52,7 @@ check-env-only:
 $(CONTENT_ID).pkg: pkg.gp4
 	$(TOOLCHAIN)/bin/$(CDIR)/PkgTool.Core pkg_build $< .
 
-assets: sce_sys/icon0.png $(MEDIA_FLAT)
+assets: sce_sys/icon0.png $(PACKAGE_MEDIA)
 
 sce_sys/icon0.png: tools/generate_assets.py
 	python3 tools/generate_assets.py
@@ -97,4 +98,4 @@ $(INTDIR)/%.o: $(PROJDIR)/%.cpp
 	$(CCX) $(CXXFLAGS) -o $@ $<
 
 clean:
-	rm -rf x64 eboot.bin pkg.gp4 sce_sys/param.sfo $(CONTENT_ID).pkg $(MEDIA_FLAT)
+	rm -rf x64 eboot.bin pkg.gp4 sce_sys/param.sfo $(CONTENT_ID).pkg $(PACKAGE_MEDIA)

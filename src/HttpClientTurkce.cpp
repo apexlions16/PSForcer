@@ -2,7 +2,10 @@
 #include "FileUtil.h"
 #include "HttpMessages.h"
 
+#include <algorithm>
+#include <cctype>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <sstream>
 #include <sys/stat.h>
@@ -14,6 +17,15 @@
 #include <orbis/Net.h>
 #include <orbis/Ssl.h>
 #include <orbis/Sysmodule.h>
+
+// OpenOrbis başlığında bu üç işlev eski, parametresiz bildirimlerle yer alıyor.
+// Gerçek libSceHttp imzalarına güvenli takma ad veriyoruz.
+extern "C" int32_t psfHttpSetAutoRedirect(int32_t id, int32_t enabled)
+    __asm__("sceHttpSetAutoRedirect");
+extern "C" int32_t psfHttpSetRecvTimeOut(int32_t id, uint32_t usec)
+    __asm__("sceHttpSetRecvTimeOut");
+extern "C" int32_t psfHttpSetRecvBlockSize(int32_t id, uint32_t size)
+    __asm__("sceHttpSetRecvBlockSize");
 #endif
 
 namespace psforcer {
@@ -34,6 +46,79 @@ std::string huggingFaceToken() {
     const std::string token = trim(readFirstLine("/data/psforcer/hf_token.txt"));
     if (token.empty() || token[0] == '#') return std::string();
     return token;
+}
+
+std::string lowerAscii(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(),
+                   static_cast<int(*)(int)>(std::tolower));
+    return value;
+}
+
+bool isRedirectStatus(int status) {
+    return status == 301 || status == 302 || status == 303 ||
+           status == 307 || status == 308;
+}
+
+std::string responseHeaderValue(int requestId, const std::string& wantedName) {
+    char* raw = NULL;
+    size_t rawSize = 0;
+    if (sceHttpGetAllResponseHeaders(requestId, &raw, &rawSize) < 0 || !raw || rawSize == 0)
+        return std::string();
+
+    const std::string headers(raw, rawSize);
+    const std::string wanted = lowerAscii(wantedName);
+    size_t cursor = 0;
+    while (cursor < headers.size()) {
+        const size_t end = headers.find('\n', cursor);
+        const size_t lineEnd = end == std::string::npos ? headers.size() : end;
+        std::string line = headers.substr(cursor, lineEnd - cursor);
+        if (!line.empty() && line[line.size() - 1] == '\r') line.erase(line.size() - 1);
+        const size_t colon = line.find(':');
+        if (colon != std::string::npos) {
+            const std::string name = lowerAscii(trim(line.substr(0, colon)));
+            if (name == wanted) return trim(line.substr(colon + 1));
+        }
+        if (end == std::string::npos) break;
+        cursor = end + 1;
+    }
+    return std::string();
+}
+
+std::string absoluteRedirectUrl(const std::string& current, const std::string& location) {
+    if (location.compare(0, 7, "http://") == 0 || location.compare(0, 8, "https://") == 0)
+        return location;
+
+    const size_t schemeEnd = current.find("://");
+    if (schemeEnd == std::string::npos) return location;
+    const std::string scheme = current.substr(0, schemeEnd);
+
+    if (location.compare(0, 2, "//") == 0) return scheme + ":" + location;
+
+    const size_t hostStart = schemeEnd + 3;
+    const size_t pathStart = current.find('/', hostStart);
+    const std::string origin = pathStart == std::string::npos
+        ? current
+        : current.substr(0, pathStart);
+
+    if (!location.empty() && location[0] == '/') return origin + location;
+
+    const size_t lastSlash = current.rfind('/');
+    if (lastSlash == std::string::npos || lastSlash < hostStart) return origin + "/" + location;
+    return current.substr(0, lastSlash + 1) + location;
+}
+
+uint64_t contentRangeTotal(const std::string& value) {
+    const size_t slash = value.rfind('/');
+    if (slash == std::string::npos || slash + 1 >= value.size() || value[slash + 1] == '*')
+        return 0;
+    return static_cast<uint64_t>(std::strtoull(value.substr(slash + 1).c_str(), NULL, 10));
+}
+
+void closeRequestObjects(int& requestId, int& connectionId) {
+    if (requestId > 0) sceHttpDeleteRequest(requestId);
+    if (connectionId > 0) sceHttpDeleteConnection(connectionId);
+    requestId = 0;
+    connectionId = 0;
 }
 }
 #endif
@@ -62,14 +147,14 @@ bool HttpClient::initialize(std::string& error) {
         const int netInitResult = sceNetInit();
         (void)netInitResult;
 
-        gNetPoolId = sceNetPoolCreate("PSForcerAg", 512 * 1024, 0);
+        gNetPoolId = sceNetPoolCreate("PSForcerAg", 2 * 1024 * 1024, 0);
         if (gNetPoolId < 0) {
             error = PSF_AG_HAVUZU;
             gNetPoolId = 0;
             return false;
         }
 
-        gSslContextId = sceSslInit(1024 * 1024);
+        gSslContextId = sceSslInit(2 * 1024 * 1024);
         if (gSslContextId < 0) {
             error = PSF_SSL;
             sceNetPoolDestroy(gNetPoolId);
@@ -78,7 +163,7 @@ bool HttpClient::initialize(std::string& error) {
             return false;
         }
 
-        gHttpContextId = sceHttpInit(gNetPoolId, gSslContextId, 2 * 1024 * 1024);
+        gHttpContextId = sceHttpInit(gNetPoolId, gSslContextId, 8 * 1024 * 1024);
         if (gHttpContextId < 0) {
             error = PSF_HTTP;
             sceSslTerm();
@@ -141,63 +226,111 @@ bool HttpClient::download(const std::string& url, const std::string& destination
     size_t responseLength = 0;
     uint64_t total = 0;
     uint64_t downloaded = 0;
+    uint64_t rangeTotal = 0;
+    std::string currentUrl = url;
+    bool allowToken = true;
+    int redirectCount = 0;
+    int authFallbackCount = 0;
 
-    std::vector<uint8_t> buffer(64 * 1024);
+    // Daha büyük blok, libSceHttp çağrı sayısını düşürür ve PS4 üzerinde
+    // tek bağlantılı indirme hızını belirgin biçimde iyileştirir.
+    std::vector<uint8_t> buffer(512 * 1024);
 
-    templateId = sceHttpCreateTemplate(httpContextId_, "PSForcer/0.17", ORBIS_HTTP_VERSION_1_1, 1);
+    templateId = sceHttpCreateTemplate(httpContextId_, "PSForcer/0.18", ORBIS_HTTP_VERSION_1_1, 1);
     if (templateId < 0) {
         error = PSF_SABLON;
         return false;
     }
 
-    connectionId = sceHttpCreateConnectionWithURL(templateId, url.c_str(), true);
-    if (connectionId < 0) {
-        error = PSF_BAGLANTI;
-        goto cleanup;
-    }
-
-    requestId = sceHttpCreateRequestWithURL(connectionId, ORBIS_METHOD_GET, url.c_str(), 0);
-    if (requestId < 0) {
-        error = PSF_ISTEK;
-        goto cleanup;
-    }
-
-    sceHttpAddRequestHeader(requestId, "Accept", "application/octet-stream", 0);
-    if (isHuggingFaceUrl(url)) {
-        const std::string token = huggingFaceToken();
-        if (!token.empty()) {
-            const std::string authorization = "Bearer " + token;
-            sceHttpAddRequestHeader(requestId, "Authorization", authorization.c_str(), 0);
+    while (true) {
+        connectionId = sceHttpCreateConnectionWithURL(templateId, currentUrl.c_str(), true);
+        if (connectionId < 0) {
+            error = PSF_BAGLANTI;
+            goto cleanup;
         }
-    }
 
-    sceHttpSetResolveTimeOut(requestId, 15 * 1000 * 1000);
-    sceHttpSetConnectTimeOut(requestId, 20 * 1000 * 1000);
-    sceHttpSetSendTimeOut(requestId, 20 * 1000 * 1000);
-
-    if (existing > 0) {
-        std::ostringstream range;
-        range << "bytes=" << existing << '-';
-        if (sceHttpAddRequestHeader(requestId, "Range", range.str().c_str(), 0) < 0) {
-            existing = 0;
+        requestId = sceHttpCreateRequestWithURL(connectionId, ORBIS_METHOD_GET,
+                                                currentUrl.c_str(), 0);
+        if (requestId < 0) {
+            error = PSF_ISTEK;
+            goto cleanup;
         }
+
+        // Yönlendirmeyi kendimiz izliyoruz. Böylece Range başlığı Hugging Face'in
+        // imzalı CDN adresine geçerken kaybolmuyor.
+        psfHttpSetAutoRedirect(requestId, 0);
+        psfHttpSetRecvBlockSize(requestId, 512 * 1024);
+        psfHttpSetRecvTimeOut(requestId, 60 * 1000 * 1000);
+        sceHttpSetResolveTimeOut(requestId, 20 * 1000 * 1000);
+        sceHttpSetConnectTimeOut(requestId, 30 * 1000 * 1000);
+        sceHttpSetSendTimeOut(requestId, 30 * 1000 * 1000);
+
+        sceHttpAddRequestHeader(requestId, "Accept", "application/octet-stream", 0);
+        sceHttpAddRequestHeader(requestId, "Accept-Encoding", "identity", 0);
+        sceHttpAddRequestHeader(requestId, "Connection", "keep-alive", 0);
+
+        bool tokenAdded = false;
+        if (allowToken && isHuggingFaceUrl(currentUrl)) {
+            const std::string token = huggingFaceToken();
+            if (!token.empty()) {
+                const std::string authorization = "Bearer " + token;
+                sceHttpAddRequestHeader(requestId, "Authorization", authorization.c_str(), 0);
+                tokenAdded = true;
+            }
+        }
+
+        if (existing > 0) {
+            std::ostringstream range;
+            range << "bytes=" << existing << '-';
+            if (sceHttpAddRequestHeader(requestId, "Range", range.str().c_str(), 0) < 0)
+                existing = 0;
+        }
+
+        if (sceHttpSendRequest(requestId, NULL, 0) < 0) {
+            error = PSF_GONDER;
+            goto cleanup;
+        }
+
+        if (sceHttpGetStatusCode(requestId, &statusCode) < 0) {
+            error = PSF_DURUM;
+            goto cleanup;
+        }
+
+        // Geçersiz/eski token public bir dosyayı engellemesin: bir kez anonim dene.
+        if (statusCode == 401 && tokenAdded && authFallbackCount == 0) {
+            ++authFallbackCount;
+            allowToken = false;
+            closeRequestObjects(requestId, connectionId);
+            continue;
+        }
+
+        if (isRedirectStatus(statusCode)) {
+            if (++redirectCount > 8) {
+                error = "İndirme yönlendirme sınırını aştı";
+                goto cleanup;
+            }
+            const std::string location = responseHeaderValue(requestId, "Location");
+            if (location.empty()) {
+                error = "İndirme yönlendirmesinde hedef adres bulunamadı";
+                goto cleanup;
+            }
+            currentUrl = absoluteRedirectUrl(currentUrl, location);
+            closeRequestObjects(requestId, connectionId);
+            continue;
+        }
+        break;
     }
 
-    if (sceHttpSendRequest(requestId, NULL, 0) < 0) {
-        error = PSF_GONDER;
-        goto cleanup;
-    }
-
-    if (sceHttpGetStatusCode(requestId, &statusCode) < 0) {
-        error = PSF_DURUM;
+    if (statusCode == 416 && existing > 0) {
+        success = true;
         goto cleanup;
     }
 
     if (statusCode != 200 && statusCode != 206) {
-        if (statusCode == 401 && isHuggingFaceUrl(url)) {
-            error = "Hugging Face erişimi reddetti (401): hf_token.txt gerekli veya depo herkese açık olmalı";
-        } else if (statusCode == 403 && isHuggingFaceUrl(url)) {
-            error = "Hugging Face erişimi reddetti (403): belirteç iznini ve depo erişimini denetleyin";
+        if (statusCode == 401 && isHuggingFaceUrl(currentUrl)) {
+            error = "Hugging Face erişimi reddetti (401): token geçersiz veya depo erişimi kapalı";
+        } else if (statusCode == 403) {
+            error = "İndirme sunucusu erişimi reddetti (403)";
         } else {
             std::ostringstream durum;
             durum << "İndirme isteği başarısız oldu; durum kodu: " << statusCode;
@@ -206,11 +339,14 @@ bool HttpClient::download(const std::string& url, const std::string& destination
         goto cleanup;
     }
 
+    // Sunucu Range isteğini yok saydıysa dosyayı baştan, bozmadan yaz.
     if (statusCode == 200 && existing > 0) existing = 0;
 
-    if (sceHttpGetResponseContentLength(requestId, &contentLengthType, &responseLength) >= 0) {
+    if (sceHttpGetResponseContentLength(requestId, &contentLengthType, &responseLength) >= 0)
         total = existing + static_cast<uint64_t>(responseLength);
-    }
+
+    rangeTotal = contentRangeTotal(responseHeaderValue(requestId, "Content-Range"));
+    if (rangeTotal > 0) total = rangeTotal;
 
     output = std::fopen(destination.c_str(), existing > 0 ? "ab" : "wb");
     if (!output) {
@@ -228,9 +364,14 @@ bool HttpClient::download(const std::string& url, const std::string& destination
             goto cleanup;
         }
 
-        const int read = sceHttpReadData(requestId, &buffer[0], static_cast<uint32_t>(buffer.size()));
+        const int read = sceHttpReadData(requestId, &buffer[0],
+                                         static_cast<uint32_t>(buffer.size()));
         if (read < 0) {
-            error = PSF_AG_OKUMA;
+            int32_t lastErrno = 0;
+            sceHttpGetLastErrno(requestId, &lastErrno);
+            std::ostringstream message;
+            message << PSF_AG_OKUMA << " (" << lastErrno << ")";
+            error = message.str();
             goto cleanup;
         }
         if (read == 0) break;
@@ -253,8 +394,7 @@ bool HttpClient::download(const std::string& url, const std::string& destination
 
 cleanup:
     if (output) std::fclose(output);
-    if (requestId > 0) sceHttpDeleteRequest(requestId);
-    if (connectionId > 0) sceHttpDeleteConnection(connectionId);
+    closeRequestObjects(requestId, connectionId);
     if (templateId > 0) sceHttpDeleteTemplate(templateId);
     return success;
 #else
@@ -283,7 +423,7 @@ cleanup:
     }
 
     uint64_t copied = existing;
-    std::vector<uint8_t> buffer(64 * 1024);
+    std::vector<uint8_t> buffer(512 * 1024);
     bool success = true;
     if (progress) progress(HttpProgress{copied, total});
 
