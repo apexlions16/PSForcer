@@ -1,6 +1,6 @@
-# PSForcer OpenOrbis paket bilgileri - v0.21
+# PSForcer OpenOrbis paket bilgileri - v0.22
 TITLE       := PSForcer
-VERSION     := 0.21
+VERSION     := 0.22
 TITLE_ID    := PSFC00001
 CONTENT_ID  := IV0000-PSFC00001_00-PSFORCERCLIENT00
 
