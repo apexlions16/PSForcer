@@ -1,6 +1,6 @@
 # PSForcer katalog bildirimi
 
-PSForcer tek bir JSON belgesi okur. Paket içindeki örnek `assets/catalog.json` dosyasıdır; aynı yapı Hugging Face üzerinde barındırılabilir.
+PSForcer tek bir JSON belgesi okur. Paket içindeki `assets/catalog.json` çevrimdışı yedektir. Güncel katalog GitHub’daki `catalog/katalog.json` dosyasında tutulur; Hugging Face yalnızca büyük PKG dosyalarını barındırır.
 
 ## Üst düzey alanlar
 
@@ -55,9 +55,9 @@ PSForcer tek bir JSON belgesi okur. Paket içindeki örnek `assets/catalog.json`
       "releaseYear": 2026,
       "accent": "6C63FF",
       "media": {
-        "cover": "https://huggingface.co/datasets/KULLANICI/DEPO/resolve/main/gorseller/ornek-kapak.png",
-        "hero": "https://huggingface.co/datasets/KULLANICI/DEPO/resolve/main/gorseller/ornek-genis.jpg",
-        "trailer": "https://huggingface.co/datasets/KULLANICI/DEPO/resolve/main/gorseller/ornek-tanitim.mp4",
+        "cover": "https://raw.githubusercontent.com/KULLANICI/KATALOG/main/medya/ornek-kapak.jpg",
+        "hero": "https://raw.githubusercontent.com/KULLANICI/KATALOG/main/medya/ornek-genis.jpg",
+        "trailer": "https://github.com/KULLANICI/KATALOG/releases/download/medya/ornek-tanitim.mp4",
         "screenshots": []
       },
       "packages": [
@@ -78,15 +78,14 @@ PSForcer tek bir JSON belgesi okur. Paket içindeki örnek `assets/catalog.json`
 }
 ```
 
-## Önerilen Hugging Face düzeni
+## Depolama ayrımı
 
 ```text
-catalog.json
-gorseller/
-  oyun-kimligi-kapak.png
-  oyun-kimligi-genis.jpg
-  oyun-kimligi-tanitim.mp4
-paketler/
+GitHub
+  catalog/katalog.json
+  medya bağlantıları ve küçük yönetim dosyaları
+
+Hugging Face
   oyun-kimligi-ana-1.00.pkg
   oyun-kimligi-guncelleme-1.01.pkg
   oyun-kimligi-ek-paket-adi.pkg

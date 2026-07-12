@@ -1,8 +1,14 @@
 #include "DownloadManager.h"
+#include "FileUtil.h"
 #include "Sha256.h"
 
 #include <algorithm>
 #include <cctype>
+#include <sstream>
+
+#if defined(PSFORCER_ORBIS)
+#include <SDL2/SDL.h>
+#endif
 
 namespace psforcer {
 
@@ -14,11 +20,25 @@ std::string lower(std::string value) {
 }
 }
 
-DownloadManager::DownloadManager() : cancelRequested_(false) {}
+DownloadManager::DownloadManager()
+#if defined(PSFORCER_ORBIS)
+    : worker_(NULL),
+#else
+    :
+#endif
+      cancelRequested_(false) {}
 
-DownloadManager::~DownloadManager() {
-    cancel();
+DownloadManager::~DownloadManager() { stopAndWait(); }
+
+void DownloadManager::waitWorker() {
+#if defined(PSFORCER_ORBIS)
+    if (worker_) {
+        SDL_WaitThread(worker_, NULL);
+        worker_ = NULL;
+    }
+#else
     if (worker_.joinable()) worker_.join();
+#endif
 }
 
 bool DownloadManager::start(const DownloadRequest& request, std::string& error) {
@@ -30,7 +50,14 @@ bool DownloadManager::start(const DownloadRequest& request, std::string& error) 
         error = "İndirme adresi boş";
         return false;
     }
-    if (worker_.joinable()) worker_.join();
+
+    waitWorker();
+
+    // Ağ modüllerini ve HTTP bağlamını ana iş parçacığında hazırla.
+    // PS4'te modül yükleme ve ilk ağ başlatma işlemlerini yeni oluşturulan
+    // iş parçacığının içinde yapmak bazı ortamlarda CE-34878-0 ile sonuçlanabiliyor.
+    if (!client_.initialize(error)) return false;
+
     cancelRequested_.store(false);
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -40,16 +67,50 @@ bool DownloadManager::start(const DownloadRequest& request, std::string& error) 
         snapshot_.id = request.id;
         snapshot_.label = request.label;
         snapshot_.destination = request.destination;
+        snapshot_.total = request.expectedSize;
+#if defined(PSFORCER_ORBIS)
+        pendingRequest_ = request;
+#endif
     }
+
+#if defined(PSFORCER_ORBIS)
+    worker_ = SDL_CreateThread(&DownloadManager::threadEntry, "PSForcerIndirme", this);
+    if (!worker_) {
+        error = std::string("İndirme iş parçacığı oluşturulamadı: ") + SDL_GetError();
+        std::lock_guard<std::mutex> lock(mutex_);
+        snapshot_.state = DownloadState::Failed;
+        snapshot_.error = error;
+        return false;
+    }
+#else
     worker_ = std::thread(&DownloadManager::run, this, request);
+#endif
     return true;
 }
 
+#if defined(PSFORCER_ORBIS)
+int DownloadManager::threadEntry(void* data) {
+    DownloadManager* self = static_cast<DownloadManager*>(data);
+    DownloadRequest request;
+    {
+        std::lock_guard<std::mutex> lock(self->mutex_);
+        request = self->pendingRequest_;
+    }
+    self->run(request);
+    return 0;
+}
+#endif
+
 void DownloadManager::cancel() { cancelRequested_.store(true); }
+
+void DownloadManager::stopAndWait() {
+    cancel();
+    waitWorker();
+}
 
 void DownloadManager::reset() {
     if (busy()) return;
-    if (worker_.joinable()) worker_.join();
+    waitWorker();
     std::lock_guard<std::mutex> lock(mutex_);
     snapshot_ = DownloadSnapshot();
 }
@@ -70,10 +131,11 @@ void DownloadManager::run(DownloadRequest request) {
         request.url,
         request.destination,
         request.resume,
-        [this](const HttpProgress& progress) {
+        [this, request](const HttpProgress& progress) {
             std::lock_guard<std::mutex> lock(mutex_);
             snapshot_.downloaded = progress.downloaded;
-            snapshot_.total = progress.total;
+            if (progress.total > 0) snapshot_.total = progress.total;
+            else if (snapshot_.total == 0) snapshot_.total = request.expectedSize;
         },
         &cancelRequested_,
         error);
@@ -83,6 +145,22 @@ void DownloadManager::run(DownloadRequest request) {
         snapshot_.state = cancelRequested_.load() ? DownloadState::Cancelled : DownloadState::Failed;
         snapshot_.error = error;
         return;
+    }
+
+    if (request.expectedSize > 0) {
+        const uint64_t actualSize = fileSize(request.destination);
+        if (actualSize != request.expectedSize) {
+            std::ostringstream message;
+            message << "Dosya boyutu doğrulanamadı. Beklenen "
+                    << request.expectedSize << " bayt, alınan "
+                    << actualSize << " bayt";
+            std::lock_guard<std::mutex> lock(mutex_);
+            snapshot_.downloaded = actualSize;
+            snapshot_.total = request.expectedSize;
+            snapshot_.state = DownloadState::Failed;
+            snapshot_.error = message.str();
+            return;
+        }
     }
 
     if (!request.sha256.empty()) {
@@ -106,6 +184,8 @@ void DownloadManager::run(DownloadRequest request) {
     }
 
     std::lock_guard<std::mutex> lock(mutex_);
+    snapshot_.downloaded = fileSize(request.destination);
+    if (snapshot_.total == 0) snapshot_.total = snapshot_.downloaded;
     snapshot_.state = DownloadState::Completed;
 }
 
