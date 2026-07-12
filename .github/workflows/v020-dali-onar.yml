@@ -1,0 +1,173 @@
+name: v0.2.0 düzeltme dalını onar
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/v020-dali-onar.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  onar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Depoyu al
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Düzeltme dalını güncelle ve geçici akışları temizle
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin duzeltme/geri-sarma-v020
+          git switch -C duzeltme/geri-sarma-v020 origin/duzeltme/geri-sarma-v020
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          http = Path('src/HttpClientTurkce.cpp')
+          text = http.read_text()
+
+          old_cache_init = (
+              '    const bool cachedAvailable = cachedSourceUrl_ == url && !cachedResolvedUrl_.empty();\n'
+              '    bool cacheAttempt = cachedAvailable;\n'
+              '    std::string currentUrl = cachedAvailable ? cachedResolvedUrl_ : url;\n'
+          )
+          new_cache_init = (
+              '    // Her devam isteği ana Hugging Face adresinden çözülür. İmzalı CDN\n'
+              '    // adresini yeniden kullanmak bazı sunucularda Range başlığının yok\n'
+              '    // sayılmasına ve mevcut parçanın baştan yazılmasına yol açıyordu.\n'
+              '    std::string currentUrl = url;\n'
+          )
+          if old_cache_init not in text:
+              raise SystemExit('CDN başlangıç bloğu bulunamadı')
+          text = text.replace(old_cache_init, new_cache_init, 1)
+
+          cache_block = '''        if (cacheAttempt && (statusCode == 401 || statusCode == 403 ||
+                             statusCode == 404 || statusCode == 416 ||
+                             (statusCode == 200 && existing > 0 && rangeRequested))) {
+            cachedSourceUrl_.clear();
+            cachedResolvedUrl_.clear();
+            cacheAttempt = false;
+            currentUrl = url;
+            redirectCount = 0;
+            allowToken = true;
+            authFallbackCount = 0;
+            closeRequestObjects(requestId, connectionId);
+            continue;
+        }
+
+'''
+          if cache_block not in text:
+              raise SystemExit('CDN önbellek bloğu bulunamadı')
+          text = text.replace(cache_block, '', 1)
+
+          old_range = '''            if (sceHttpAddRequestHeader(requestId, "Range", range.str().c_str(), 0) >= 0)
+                rangeRequested = true;
+'''
+          new_range = '''            if (sceHttpAddRequestHeader(requestId, "Range", range.str().c_str(), 0) < 0) {
+                error = "Kaldığı yerden devam başlığı eklenemedi; mevcut parça korundu";
+                goto cleanup;
+            }
+            rangeRequested = true;
+'''
+          if old_range not in text:
+              raise SystemExit('Range başlığı bloğu bulunamadı')
+          text = text.replace(old_range, new_range, 1)
+
+          old_200 = '''    if (statusCode == 200 && existing > 0) {
+        // Kaldığı yerden devam isteği yok sayıldıysa bozuk veri eklemeyelim.
+        // Asıl Hugging Face adresinden gelen 200 tam dosya akışı olabilir; baştan yaz.
+        existing = 0;
+    }
+'''
+          new_200 = '''    if (statusCode == 200 && existing > 0) {
+        // Sunucu Range isteğini yok saydığında mevcut .parca dosyasını asla
+        // "wb" ile açma. Bu kural indirme sayacının geri gitmesini engeller.
+        error = "Sunucu kaldığı yerden devam isteğini yok saydı; mevcut parça korundu";
+        goto cleanup;
+    }
+'''
+          if old_200 not in text:
+              raise SystemExit('HTTP 200 geri sarma bloğu bulunamadı')
+          text = text.replace(old_200, new_200, 1)
+
+          old_cache_save = '''    if (currentUrl != url) {
+        cachedSourceUrl_ = url;
+        cachedResolvedUrl_ = currentUrl;
+    }
+'''
+          if old_cache_save not in text:
+              raise SystemExit('CDN önbellek kayıt bloğu bulunamadı')
+          text = text.replace(old_cache_save, '', 1)
+          text = text.replace('PSForcer/0.19', 'PSForcer/0.20')
+          http.write_text(text)
+
+          header = Path('src/HttpClient.h')
+          text = header.read_text()
+          text = text.replace('    std::string cachedSourceUrl_;\n    std::string cachedResolvedUrl_;\n', '')
+          header.write_text(text)
+
+          makefile = Path('Makefile')
+          text = makefile.read_text().replace('v0.19', 'v0.20')
+          text = text.replace('VERSION     := 0.19', 'VERSION     := 0.20')
+          makefile.write_text(text)
+
+          workflow = Path('.github/workflows/build-pkg-release.yml')
+          text = workflow.read_text()
+          text = text.replace('YAYIN_ETIKETI: v0.1.9', 'YAYIN_ETIKETI: v0.2.0')
+          text = text.replace('ESKI_YAYIN_ETIKETI: v0.1.8', 'ESKI_YAYIN_ETIKETI: v0.1.9')
+          text = text.replace('PSForcer v0.1.9 Kesintisiz Hugging Face Akışı',
+                              'PSForcer v0.2.0 Geri Sarma Koruması')
+          old_note = ('Büyük paketler 64 MiB aralıklarla indirilir; imzalı Hugging Face CDN adresi '
+                      'sonraki aralıklarda yeniden kullanılır. Veri ilerleyen parça geçişleri artık hata '
+                      'sayılmaz ve aralarında yapay bekleme yapılmaz. CDN adresi geçersizleşirse ana '
+                      'Hugging Face adresine otomatik dönülür; Content-Range başlangıcı doğrulanır ve '
+                      'gerçek indirme hızı ölçülür.')
+          new_note = ('Kaldığı yerden devam isteği HTTP 200 ile yok sayıldığında mevcut .parca dosyası '
+                      'artık asla baştan yazılmaz. Her parça ana Hugging Face adresinden yeniden çözülür, '
+                      'Range ve Content-Range doğrulanır; böylece 50 MB civarında görülen geri sarma '
+                      'döngüsü engellenir. Mevcut yarım indirme korunur ve kaldığı yerden sürdürülür.')
+          text = text.replace(old_note, new_note)
+          workflow.write_text(text)
+
+          Path('.github/workflows/validate.yml').write_text('''name: Katalog çekirdeğini doğrula
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  sinama:
+    name: Sınama
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kaynakları al
+        uses: actions/checkout@v4
+      - name: Yapılandır
+        run: cmake -S . -B build
+      - name: Derle
+        run: cmake --build build --parallel
+      - name: Sınamaları çalıştır
+        run: ctest --test-dir build --output-on-failure
+      - name: Yerleşik kataloğu doğrula
+        run: python3 tools/validate_catalog.py assets/catalog.json
+''')
+          Path('.github/workflows/v020-geri-sarma-onar.yml').unlink(missing_ok=True)
+          PY
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'İndirme geri sarmasını kalıcı olarak engelle'
+          git push origin HEAD:duzeltme/geri-sarma-v020
+
+          git switch main
+          rm -f .github/workflows/v020-dali-onar.yml
+          git add .github/workflows/v020-dali-onar.yml
+          git commit -m 'Geçici v0.2.0 dal onarım akışını kaldır [skip ci]'
+          git push origin main
