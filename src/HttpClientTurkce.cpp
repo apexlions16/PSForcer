@@ -226,6 +226,7 @@ bool HttpClient::download(const std::string& url, const std::string& destination
     size_t responseLength = 0;
     uint64_t total = 0;
     uint64_t downloaded = 0;
+    uint64_t rangeTotal = 0;
     std::string currentUrl = url;
     bool allowToken = true;
     int redirectCount = 0;
@@ -344,7 +345,7 @@ bool HttpClient::download(const std::string& url, const std::string& destination
     if (sceHttpGetResponseContentLength(requestId, &contentLengthType, &responseLength) >= 0)
         total = existing + static_cast<uint64_t>(responseLength);
 
-    const uint64_t rangeTotal = contentRangeTotal(responseHeaderValue(requestId, "Content-Range"));
+    rangeTotal = contentRangeTotal(responseHeaderValue(requestId, "Content-Range"));
     if (rangeTotal > 0) total = rangeTotal;
 
     output = std::fopen(destination.c_str(), existing > 0 ? "ab" : "wb");
