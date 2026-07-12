@@ -26,6 +26,7 @@ jobs:
       - name: Kaynak düzeltmesini uygula
         shell: bash
         run: |
+          # Tekil yeniden çalıştırma: v0.2.3
           set +e
           python3 tools/v023_apply.py > v023-run.log 2>&1
           durum=$?
