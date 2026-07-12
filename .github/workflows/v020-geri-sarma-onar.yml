@@ -5,12 +5,15 @@ on:
     branches: [duzeltme/geri-sarma-v020]
     paths:
       - '.github/workflows/v020-geri-sarma-onar.yml'
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
 
 jobs:
   onar:
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,14 +31,20 @@ jobs:
           http = Path('src/HttpClientTurkce.cpp')
           text = http.read_text()
 
-          text = text.replace(
+          old_cache_init = (
               '    const bool cachedAvailable = cachedSourceUrl_ == url && !cachedResolvedUrl_.empty();\n'
               '    bool cacheAttempt = cachedAvailable;\n'
-              '    std::string currentUrl = cachedAvailable ? cachedResolvedUrl_ : url;\n',
+              '    std::string currentUrl = cachedAvailable ? cachedResolvedUrl_ : url;\n'
+          )
+          new_cache_init = (
               '    // Her devam isteği ana Hugging Face adresinden çözülür. İmzalı CDN\n'
               '    // adresini yeniden kullanmak bazı sunucularda Range başlığının yok\n'
               '    // sayılmasına ve mevcut parçanın baştan yazılmasına yol açıyordu.\n'
-              '    std::string currentUrl = url;\n', 1)
+              '    std::string currentUrl = url;\n'
+          )
+          if old_cache_init not in text:
+              raise SystemExit('CDN başlangıç bloğu bulunamadı')
+          text = text.replace(old_cache_init, new_cache_init, 1)
 
           cache_block = '''        if (cacheAttempt && (statusCode == 401 || statusCode == 403 ||
                              statusCode == 404 || statusCode == 416 ||
@@ -76,8 +85,8 @@ jobs:
     }
 '''
           new_200 = '''    if (statusCode == 200 && existing > 0) {
-        // En önemli güvenlik kuralı: sunucu Range isteğini yok saydığında mevcut
-        // .parca dosyasını asla "wb" ile açma ve indirmeyi geriye sarma.
+        // Sunucu Range isteğini yok saydığında mevcut .parca dosyasını asla
+        // "wb" ile açma. Bu kural indirme sayacının geri gitmesini engeller.
         error = "Sunucu kaldığı yerden devam isteğini yok saydı; mevcut parça korundu";
         goto cleanup;
     }
@@ -94,7 +103,6 @@ jobs:
           if old_cache_save not in text:
               raise SystemExit('CDN önbellek kayıt bloğu bulunamadı')
           text = text.replace(old_cache_save, '', 1)
-
           text = text.replace('PSForcer/0.19', 'PSForcer/0.20')
           http.write_text(text)
 
@@ -104,8 +112,7 @@ jobs:
           header.write_text(text)
 
           makefile = Path('Makefile')
-          text = makefile.read_text()
-          text = text.replace('v0.19', 'v0.20')
+          text = makefile.read_text().replace('v0.19', 'v0.20')
           text = text.replace('VERSION     := 0.19', 'VERSION     := 0.20')
           makefile.write_text(text)
 
