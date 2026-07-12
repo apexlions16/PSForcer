@@ -84,6 +84,25 @@ int main() {
         std::cerr << "Yanlış dosya boyutu yakalanamadı\n";
         return 1;
     }
+    manager.reset();
+
+    // Kaynak dosya katalogdaki hedef boyutundan daha büyük olsa bile indirici,
+    // tam hedef baytına ulaştığı anda EOF beklemeden tamamlanmalıdır.
+    std::remove(destination.c_str());
+    request.jobId = 3;
+    request.expectedSize = payload.size() - 12345;
+    request.resume = false;
+    if (!manager.start(request, error)) {
+        std::cerr << error << '\n';
+        return 1;
+    }
+    snapshot = waitFor(manager);
+    if (snapshot.state != psforcer::DownloadState::Completed ||
+        psforcer::fileSize(destination) != request.expectedSize) {
+        std::cerr << "Tam hedef boyutunda EOF beklemeden tamamlanamadı: "
+                  << snapshot.error << '\n';
+        return 1;
+    }
 
     manager.stopAndWait();
     std::remove(source.c_str());
