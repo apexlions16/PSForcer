@@ -5,12 +5,17 @@ on:
     branches: [duzeltme/kalici-yazma-v021]
     paths:
       - '.github/workflows/v021-kalici-yazma-onar.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/v021-kalici-yazma-onar.yml'
 
 permissions:
   contents: write
 
 jobs:
   onar:
+    if: github.event.pull_request.head.repo.full_name == github.repository || github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - name: Düzeltme dalını al
@@ -275,8 +280,6 @@ jobs:
         downloaded += readSize;
         responseBytes += readSize;
 
-        // İlerleme yalnızca mutlak konuma yazılmış veri üzerinden hesaplanır.
-        // Her 8 MiB'de diske zorla; bağlantı kopsa bile sayaç geri dönmesin.
         if (downloaded - lastSynced >= 8ULL * 1024ULL * 1024ULL) {
             if (sceKernelFsync(outputFd) < 0) {
                 error = "İndirilen veri diske kaydedilemedi";
