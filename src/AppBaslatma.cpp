@@ -9,7 +9,7 @@ namespace psforcer {
 namespace {
 const int kEkranGenisligi = 1920;
 const int kEkranYuksekligi = 1080;
-const int kSutunSayisi = 5;
+const int kSutunSayisi = 4;
 }
 
 App::App()
