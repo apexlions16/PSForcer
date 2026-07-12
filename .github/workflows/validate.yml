@@ -1,19 +1,21 @@
-name: Validate catalog core
+name: Katalog çekirdeğini doğrula
 
 on:
   push:
   pull_request:
 
 jobs:
-  test:
+  sinama:
+    name: Sınama
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Configure
+      - name: Kaynakları al
+        uses: actions/checkout@v4
+      - name: Yapılandır
         run: cmake -S . -B build
-      - name: Build
+      - name: Derle
         run: cmake --build build --parallel
-      - name: Test
+      - name: Sınamaları çalıştır
         run: ctest --test-dir build --output-on-failure
-      - name: Validate bundled catalog
+      - name: Yerleşik kataloğu doğrula
         run: python3 tools/validate_catalog.py assets/catalog.json
