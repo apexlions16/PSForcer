@@ -35,6 +35,7 @@ jobs:
 
           gib="$(awk -v b="$boyut" 'BEGIN { printf "%.3f", b / 1024 / 1024 / 1024 }')"
           mib="$(awk -v b="$boyut" 'BEGIN { printf "%.2f", b / 1024 / 1024 }')"
+          oid_b64="$(printf '%s' "$oid" | base64 -w 0)"
           echo "PT_DOSYA_YOLU=PPCH4/CUSA01127-USA.pkg"
           echo "PT_PAKET_BOYUT_BAYT=$boyut"
           echo "PT_PAKET_BOYUT_MIB=$mib"
@@ -43,11 +44,11 @@ jobs:
           jq -n \
             --arg yol 'PPCH4/CUSA01127-USA.pkg' \
             --arg url "$url" \
-            --arg sha256 "$oid" \
+            --arg sha256_b64 "$oid_b64" \
             --argjson boyut "$boyut" \
             --arg mib "$mib" \
             --arg gib "$gib" \
-            '{yol:$yol,url:$url,boyut:$boyut,mib:$mib,gib:$gib,sha256:$sha256}' \
+            '{yol:$yol,url:$url,boyut:$boyut,mib:$mib,gib:$gib,sha256_b64:$sha256_b64}' \
             > pt-paket-bilgisi.json
 
       - name: Paket bilgisini sakla
