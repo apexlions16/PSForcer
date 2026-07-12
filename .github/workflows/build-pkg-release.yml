@@ -32,8 +32,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  YAYIN_ETIKETI: v0.2.3
-  ESKI_YAYIN_ETIKETI: v0.2.2
+  YAYIN_ETIKETI: v0.2.4
+  ESKI_YAYIN_ETIKETI: v0.2.3
   PAKET_ADI: IV0000-PSFC00001_00-PSFORCERCLIENT00.pkg
 
 jobs:
@@ -165,8 +165,8 @@ jobs:
           if ! gh release view "$YAYIN_ETIKETI" >/dev/null 2>&1; then
             gh release create "$YAYIN_ETIKETI" \
               --target "$GITHUB_SHA" \
-              --title 'PSForcer v0.2.3 Kesin Tamamlama' \
-              --notes 'İndirici, katalogdaki kesin dosya boyutuna veya HTTP Content-Length/Content-Range uzunluğuna ulaştığı anda sunucunun keep-alive bağlantısını kapatmasını beklemeden yanıtı tamamlar. Böylece ilerleme çubuğunun 1.4 GB / 1.4 GB noktasında İNDİRİLİYOR durumunda kalması giderildi. Tam hedef baytında EOF beklememe davranışı otomatik sınamayla doğrulanır.'
+              --title 'PSForcer v0.2.4 Son HTTP Parçası Düzeltmesi' \
+              --notes 'Son HTTP parçası 512 KiB tamponundan küçük olduğunda PS4 HTTP katmanının keep-alive bağlantısının kapanmasını beklemesi engellendi. Okuma çağrısı artık katalogda ve HTTP yanıtında kalan kesin bayt sayısıyla sınırlandırılıyor; dosya tamamen indiğinde indirme doğrudan tamamlanıyor. OpenOrbis paket derlemesi ve indirme yöneticisi regresyon testleri başarıyla doğrulandı.'
           fi
           gh release upload "$YAYIN_ETIKETI" \
             "$PAKET_ADI" "$PAKET_ADI.sha256" \
