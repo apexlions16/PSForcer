@@ -1,10 +1,10 @@
 # PSForcer OpenOrbis package metadata
 TITLE       := PSForcer
-VERSION     := 0.10
+VERSION     := 0.11
 TITLE_ID    := PSFC00001
 CONTENT_ID  := IV0000-PSFC00001_00-PSFORCERCLIENT00
 
-LIBS        := -lc -lkernel -lc++ -lSceUserService -lSceVideoOut -lSceAudioOut -lScePad -lSceSysmodule -lSDL2 -lSDL2_image -lSceNet -lSceSsl -lSceHttp
+LIBS        := -lc -lkernel -lc++ -lSceUserService -lSceVideoOut -lSceAudioOut -lScePad -lSceSysmodule -lSDL2 -lSceNet -lSceSsl -lSceHttp
 EXTRAFLAGS  := -std=gnu++11 -D_GNU_SOURCE -DPSFORCER_ORBIS=1
 
 TOOLCHAIN   := $(OO_PS4_TOOLCHAIN)
@@ -15,7 +15,7 @@ LIBMODULES  := $(wildcard sce_module/*)
 CPPFILES    := $(shell find $(PROJDIR) -name '*.cpp')
 OBJS        := $(patsubst $(PROJDIR)/%.cpp,$(INTDIR)/%.o,$(CPPFILES))
 
-CXXFLAGS    := --target=x86_64-pc-freebsd12-elf -fPIC -funwind-tables -c $(EXTRAFLAGS) -isysroot $(TOOLCHAIN) -isystem $(TOOLCHAIN)/include -isystem $(TOOLCHAIN)/include/c++/v1
+CXXFLAGS    := --target=x86_64-pc-freebsd12-elf -fPIC -funwind-tables -c $(EXTRAFLAGS) -I$(PROJDIR) -isysroot $(TOOLCHAIN) -isystem $(TOOLCHAIN)/include -isystem $(TOOLCHAIN)/include/c++/v1
 LDFLAGS     := -m elf_x86_64 -pie --script $(TOOLCHAIN)/link.x --eh-frame-hdr -L$(TOOLCHAIN)/lib $(LIBS) $(TOOLCHAIN)/lib/crt1.o
 
 UNAME_S := $(shell uname -s)
