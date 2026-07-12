@@ -1,0 +1,18 @@
+#pragma once
+
+#define PSF_AG_MODULLERI "Ağ sistem modülleri yüklenemedi"
+#define PSF_AG_HAVUZU "Ağ bellek havuzu oluşturulamadı"
+#define PSF_SSL "Güvenli bağlantı altyapısı başlatılamadı"
+#define PSF_HTTP "İnternet istemcisi başlatılamadı"
+#define PSF_KLASOR "İndirme klasörü oluşturulamadı"
+#define PSF_SABLON "İnternet istek şablonu oluşturulamadı"
+#define PSF_BAGLANTI "İndirme bağlantısı oluşturulamadı"
+#define PSF_ISTEK "İndirme isteği oluşturulamadı"
+#define PSF_GONDER "İndirme isteği gönderilemedi"
+#define PSF_DURUM "İnternet yanıt durumu okunamadı"
+#define PSF_HEDEF "Hedef dosya açılamadı"
+#define PSF_IPTAL "İndirme iptal edildi"
+#define PSF_AG_OKUMA "Ağdan veri okunamadı"
+#define PSF_YAZMA "Depolama alanına yazılamadı"
+#define PSF_YEREL "Bilgisayar yapısı yalnızca yerel dosya indirmelerini destekler"
+#define PSF_KAYNAK "Kaynak dosya açılamadı"
