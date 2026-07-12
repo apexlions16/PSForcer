@@ -36,7 +36,20 @@ jobs:
       - name: Install build dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang lld unzip jq file
+          sudo apt-get install -y unzip jq file libncurses5
+
+      - name: Install matching LLVM 18 toolchain
+        uses: gentoo-root/install-llvm-action@abb6cec0ec431e834bc5e5090ea39a2d1d63a4c6
+        with:
+          version: '18'
+          directory: ${{ runner.tool_cache }}/llvm
+          cached: false
+
+      - name: Verify compiler versions
+        run: |
+          clang --version
+          clang++ --version
+          ld.lld --version
 
       - name: Download OpenOrbis release toolchain
         env:
@@ -56,7 +69,7 @@ jobs:
           found_archive=0
           while IFS=$'\t' read -r name url; do
             case "$name" in
-              *.zip|*.tar.gz|*.tgz)
+              *llvm-18*.tar.gz|*llvm-18*.tgz|*llvm-18*.zip)
                 found_archive=1
                 destination="$RUNNER_TEMP/openorbis/assets/$name"
                 echo "Downloading $name"
@@ -72,13 +85,13 @@ jobs:
           done < "$RUNNER_TEMP/openorbis/assets.tsv"
 
           test "$found_archive" -eq 1 || {
-            echo 'No extractable OpenOrbis release archive was found.' >&2
+            echo 'No LLVM 18 OpenOrbis release archive was found.' >&2
             exit 1
           }
 
           pkg_tool="$(find "$RUNNER_TEMP/openorbis/extracted" -type f -path '*/bin/linux/PkgTool.Core' -print -quit)"
           test -n "$pkg_tool" || {
-            echo 'The downloaded release assets do not contain bin/linux/PkgTool.Core.' >&2
+            echo 'The downloaded release asset does not contain bin/linux/PkgTool.Core.' >&2
             find "$RUNNER_TEMP/openorbis/extracted" -maxdepth 4 -type f | head -200
             exit 1
           }
