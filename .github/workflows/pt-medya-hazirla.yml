@@ -1,21 +1,20 @@
 name: P.T. medya dosyalarını hazırla
 
 on:
-  push:
-    branches: [duzeltme/401-gorseller-header-v016]
-    paths:
-      - '.github/workflows/pt-medya-hazirla.yml'
+  pull_request:
+    branches: [main]
 
 permissions:
   contents: write
 
 jobs:
   hazirla:
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: duzeltme/401-gorseller-header-v016
+          ref: ${{ github.head_ref }}
           fetch-depth: 0
 
       - name: Görselleri indir ve JPEG biçimine getir
@@ -46,11 +45,11 @@ jobs:
             'https://areajugones.sport.es/wp-content/uploads/2020/03/silent-hills-PT-1560x880.jpg.webp' \
             -o /tmp/pt-medya/shot3.webp || cp /tmp/pt-medya/hero.jpg /tmp/pt-medya/shot3.webp
 
-          magick /tmp/pt-medya/hero.jpg -auto-orient -resize '1920x720^' -gravity center -extent 1920x720 -strip -quality 86 assets/media/pt/header.jpg
-          magick /tmp/pt-medya/hero.jpg -auto-orient -resize '840x470^' -gravity center -extent 840x470 -strip -quality 86 assets/media/pt/cover.jpg
-          magick /tmp/pt-medya/shot1.jpg -auto-orient -resize '720x405^' -gravity center -extent 720x405 -strip -quality 84 assets/media/pt/screenshot-1.jpg
-          magick /tmp/pt-medya/shot2.jpg -auto-orient -resize '720x405^' -gravity center -extent 720x405 -strip -quality 84 assets/media/pt/screenshot-2.jpg
-          magick /tmp/pt-medya/shot3.webp -auto-orient -resize '720x405^' -gravity center -extent 720x405 -strip -quality 84 assets/media/pt/screenshot-3.jpg
+          convert /tmp/pt-medya/hero.jpg -auto-orient -resize '1920x720^' -gravity center -extent 1920x720 -strip -quality 86 assets/media/pt/header.jpg
+          convert /tmp/pt-medya/hero.jpg -auto-orient -resize '840x470^' -gravity center -extent 840x470 -strip -quality 86 assets/media/pt/cover.jpg
+          convert /tmp/pt-medya/shot1.jpg -auto-orient -resize '720x405^' -gravity center -extent 720x405 -strip -quality 84 assets/media/pt/screenshot-1.jpg
+          convert /tmp/pt-medya/shot2.jpg -auto-orient -resize '720x405^' -gravity center -extent 720x405 -strip -quality 84 assets/media/pt/screenshot-2.jpg
+          convert /tmp/pt-medya/shot3.webp -auto-orient -resize '720x405^' -gravity center -extent 720x405 -strip -quality 84 assets/media/pt/screenshot-3.jpg
 
           identify assets/media/pt/*.jpg
 
@@ -63,4 +62,4 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add assets/media/pt .github/workflows/pt-medya-hazirla.yml
           git commit -m 'P.T. katalog görsellerini yerel depoya ekle'
-          git push origin HEAD:duzeltme/401-gorseller-header-v016
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
