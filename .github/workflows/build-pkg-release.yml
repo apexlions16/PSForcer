@@ -148,3 +148,21 @@ jobs:
           gh release upload "$RELEASE_TAG" \
             "$PKG_NAME" "$PKG_NAME.sha256" \
             --clobber
+
+      - name: Record published release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          gh release view "$RELEASE_TAG" \
+            --json tagName,url,publishedAt,assets \
+            > release/status.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add release/status.json
+          if ! git diff --cached --quiet; then
+            git commit -m "Record $RELEASE_TAG release [skip ci]"
+            git push
+          fi
