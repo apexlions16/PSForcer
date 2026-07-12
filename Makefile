@@ -10,7 +10,7 @@ EXTRAFLAGS  := -std=gnu++11 -D_GNU_SOURCE -DPSFORCER_ORBIS=1
 TOOLCHAIN   := $(OO_PS4_TOOLCHAIN)
 PROJDIR     := src
 INTDIR      := x64/Debug
-ASSETS      := $(shell find assets -type f 2>/dev/null)
+ASSETS      := $(shell find assets -type f 2>/dev/null | sort)
 LIBMODULES  := $(wildcard sce_module/*)
 CPPFILES    := $(shell find $(PROJDIR) -name '*.cpp')
 OBJS        := $(patsubst $(PROJDIR)/%.cpp,$(INTDIR)/%.o,$(CPPFILES))
