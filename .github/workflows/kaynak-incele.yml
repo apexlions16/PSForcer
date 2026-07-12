@@ -11,7 +11,16 @@ jobs:
       - uses: actions/checkout@v4
       - name: Kaynak dosyalarını ve App yöntemlerini yaz
         run: |
-          echo '--- SRC DOSYALARI ---'
-          find src -maxdepth 1 -type f -print | sort
-          echo '--- APP YÖNTEMLERİ ---'
-          grep -R -n 'App::' src || true
+          {
+            echo '--- SRC DOSYALARI ---'
+            find src -maxdepth 1 -type f -print | sort
+            echo '--- APP YÖNTEMLERİ ---'
+            grep -R -n 'App::' src || true
+            echo '--- İNDİRME BAŞLATMA ÇAĞRILARI ---'
+            grep -R -n 'downloads_\|startPackageDownload\|sceHttp' src || true
+          } > kaynak-inceleme.txt
+      - name: İnceleme çıktısını sakla
+        uses: actions/upload-artifact@v4
+        with:
+          name: kaynak-inceleme
+          path: kaynak-inceleme.txt
