@@ -6,7 +6,7 @@
 
 int main(int argc, char** argv) {
     if (argc != 2) {
-        std::cerr << "catalog path required\n";
+        std::cerr << "Katalog yolu gerekli\n";
         return 2;
     }
     psforcer::CatalogData catalog;
@@ -16,19 +16,19 @@ int main(int argc, char** argv) {
         return 1;
     }
     if (catalog.schemaVersion != 1 || catalog.items.size() != 3) {
-        std::cerr << "unexpected catalog shape\n";
+        std::cerr << "Katalog yapısı beklenenden farklı\n";
         return 1;
     }
     if (!psforcer::CatalogLoader::itemContainsKind(catalog.items[0], psforcer::PackageKind::Update)) {
-        std::cerr << "update package was not parsed\n";
+        std::cerr << "Güncelleme paketi çözümlenemedi\n";
         return 1;
     }
     psforcer::Sha256 sha;
     sha.update(std::string("abc"));
     if (sha.finalHex() != "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad") {
-        std::cerr << "SHA-256 self-test failed\n";
+        std::cerr << "SHA-256 öz sınaması başarısız\n";
         return 1;
     }
-    std::cout << "catalog parser and SHA-256 tests passed\n";
+    std::cout << "Katalog çözümleme ve SHA-256 sınamaları geçti\n";
     return 0;
 }
