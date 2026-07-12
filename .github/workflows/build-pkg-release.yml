@@ -21,8 +21,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  YAYIN_ETIKETI: v0.1.2
-  ESKI_YAYIN_ETIKETI: v0.1.1
+  YAYIN_ETIKETI: v0.1.3
+  ESKI_YAYIN_ETIKETI: v0.1.2
   PAKET_ADI: IV0000-PSFC00001_00-PSFORCERCLIENT00.pkg
 
 jobs:
@@ -135,7 +135,7 @@ jobs:
             ${{ env.PAKET_ADI }}.sha256
           if-no-files-found: warn
 
-      - name: Eski yayını kaldır
+      - name: Bozuk önceki yayını geri al
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -154,8 +154,8 @@ jobs:
           if ! gh release view "$YAYIN_ETIKETI" >/dev/null 2>&1; then
             gh release create "$YAYIN_ETIKETI" \
               --target "$GITHUB_SHA" \
-              --title 'PSForcer v0.1.2 Türkçe Arayüz Düzeltmesi' \
-              --notes 'Yazı taşmaları giderildi. Arayüz, hata iletileri, katalog örnekleri, belgeler ve iş akışları Türkçeleştirildi. Uygulama simgesi değiştirilmedi.'
+              --title 'PSForcer v0.1.3 Okunaklı Arayüz Düzeltmesi' \
+              --notes 'v0.1.2 arayüz değişikliği geri alındı. Bozuk sıkıştırılmış yazı tipi kaldırıldı, temiz 5x7 yazı takımı eklendi, kartlar dört sütunlu daha geniş düzene geçirildi ve menü metinleri ortalandı.'
           fi
           gh release upload "$YAYIN_ETIKETI" \
             "$PAKET_ADI" "$PAKET_ADI.sha256" \
