@@ -1,0 +1,19 @@
+{
+  "etiket": "v0.1.4",
+  "adres": "https://github.com/apexlions16/PSForcer/releases/tag/v0.1.4",
+  "yayin_tarihi": "2026-07-12T13:05:40Z",
+  "varliklar": [
+    {
+      "ad": "IV0000-PSFC00001_00-PSFORCERCLIENT00.pkg",
+      "boyut": 6619136,
+      "durum": "uploaded",
+      "indirme_adresi": "https://github.com/apexlions16/PSForcer/releases/download/v0.1.4/IV0000-PSFC00001_00-PSFORCERCLIENT00.pkg"
+    },
+    {
+      "ad": "IV0000-PSFC00001_00-PSFORCERCLIENT00.pkg.sha256",
+      "boyut": 107,
+      "durum": "uploaded",
+      "indirme_adresi": "https://github.com/apexlions16/PSForcer/releases/download/v0.1.4/IV0000-PSFC00001_00-PSFORCERCLIENT00.pkg.sha256"
+    }
+  ]
+}
