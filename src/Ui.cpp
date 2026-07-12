@@ -327,7 +327,16 @@ void Ui::drawDownload(const DownloadSnapshot& snapshot) {
     miktar << CatalogLoader::formatBytes(snapshot.downloaded);
     if (snapshot.total > 0) miktar << " / " << CatalogLoader::formatBytes(snapshot.total);
     drawText(miktar.str(), x + 48, y + 180, 18, Color(205, 211, 225));
-    if (!snapshot.error.empty()) drawText(snapshot.error, x + 360, y + 180, 17, Color(239, 103, 121), 550);
+    if ((snapshot.state == DownloadState::Failed || snapshot.state == DownloadState::Cancelled) &&
+    !snapshot.error.empty()) {
+    drawText(snapshot.error, x + 360, y + 180, 17, Color(239, 103, 121), 550);
+    } else if (snapshot.state == DownloadState::Running && snapshot.bytesPerSecond > 0) {
+    std::ostringstream hiz;
+    hiz << CatalogLoader::formatBytes(snapshot.bytesPerSecond) << "/S";
+    drawText(hiz.str(), x + 710, y + 180, 18, Color(110, 202, 181), 200);
+    } else if (!snapshot.status.empty()) {
+    drawText(snapshot.status, x + 360, y + 180, 17, Color(137, 148, 173), 550);
+    }
 }
 
 void Ui::drawToast(const std::string& message) {

@@ -250,6 +250,7 @@ bool HttpClient::download(const std::string& url, const std::string& destination
     uint64_t downloaded = 0;
     uint64_t requestedStart = existing;
     uint64_t requestedEnd = 0;
+    ContentRangeInfo contentRange;
     bool rangeRequested = false;
     const bool cachedAvailable = cachedSourceUrl_ == url && !cachedResolvedUrl_.empty();
     bool cacheAttempt = cachedAvailable;
@@ -326,7 +327,8 @@ bool HttpClient::download(const std::string& url, const std::string& destination
         }
 
         if (cacheAttempt && (statusCode == 401 || statusCode == 403 ||
-                             statusCode == 404 || statusCode == 416)) {
+                             statusCode == 404 || statusCode == 416 ||
+                             (statusCode == 200 && existing > 0 && rangeRequested))) {
             cachedSourceUrl_.clear();
             cachedResolvedUrl_.clear();
             cacheAttempt = false;
@@ -382,7 +384,7 @@ bool HttpClient::download(const std::string& url, const std::string& destination
         goto cleanup;
     }
 
-    const ContentRangeInfo contentRange = parseContentRange(responseHeaderValue(requestId, "Content-Range"));
+    contentRange = parseContentRange(responseHeaderValue(requestId, "Content-Range"));
     if (statusCode == 206 && contentRange.valid && rangeRequested &&
         contentRange.start != requestedStart) {
         std::ostringstream message;
