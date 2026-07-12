@@ -30,8 +30,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  YAYIN_ETIKETI: v0.2.1
-  ESKI_YAYIN_ETIKETI: v0.2.0
+  YAYIN_ETIKETI: v0.2.2
+  ESKI_YAYIN_ETIKETI: v0.2.1
   PAKET_ADI: IV0000-PSFC00001_00-PSFORCERCLIENT00.pkg
 
 jobs:
@@ -163,8 +163,8 @@ jobs:
           if ! gh release view "$YAYIN_ETIKETI" >/dev/null 2>&1; then
             gh release create "$YAYIN_ETIKETI" \
               --target "$GITHUB_SHA" \
-              --title 'PSForcer v0.2.1 Kalıcı İndirme Yazımı' \
-              --notes 'İndirilen veri stdio ekleme tamponu yerine mutlak dosya konumuna sceKernelPwrite ile yazılır ve her 8 MiB’de sceKernelFsync ile kalıcılaştırılır. Sabit 64 MiB istek sınırı kaldırılmıştır; erken kapanan bağlantılar gerçek disk boyutundan devam eder. İlerleme sayacı monoton tutulur, dosya boyutu küçülürse döngüye girmek yerine tanı kaydıyla durur.'
+              --title 'PSForcer v0.2.2 Tek Oturumlu İndirme' \
+              --notes 'PS4 üzerinde güvenilir olmadığı görülen sceKernelPwrite yolu kaldırıldı. İndirme boyunca tek bir standart libc FILE akışı açık tutulur, tampon kapatılır ve bağlantı kesilse bile aynı kesin bellek konumundan Range isteğiyle devam edilir. stat yalnızca dosya kapatıldıktan sonra doğrulama amacıyla kullanılır; böylece bağlantı yenilemelerinde sayaç ve dosya konumu geriye dönmez.'
           fi
           gh release upload "$YAYIN_ETIKETI" \
             "$PAKET_ADI" "$PAKET_ADI.sha256" \
