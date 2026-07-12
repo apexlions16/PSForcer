@@ -28,6 +28,31 @@ if marker not in text:
     )
     text = replace_once(text, anchor, anchor + insertion, "PS4 okuma döngüsü")
 
+# sceHttpReadData bazı PS4 ortamlarında istenen tamponun tamamı dolana veya
+# bağlantı kapanana kadar bekleyebiliyor. Son parça 512 KiB'den küçük olduğunda
+# dosya ağdan tamamen gelmiş görünse bile keep-alive bağlantısı indirme işçisini
+# içeride tutuyordu. Her çağrıyı dosyada ve HTTP yanıtında kalan kesin baytla
+# sınırlandır; böylece son çağrı tam kalan uzunluğu ister ve EOF beklemez.
+if "uint64_t readCapacity = buffer.size();" not in text:
+    text = replace_once(
+        text,
+        "            const int read = sceHttpReadData(requestId, &buffer[0],\n"
+        "                                             static_cast<uint32_t>(buffer.size()));",
+        "            uint64_t readCapacity = buffer.size();\n"
+        "            if (expectedSize > 0) {\n"
+        "                readCapacity = std::min<uint64_t>(\n"
+        "                    readCapacity, expectedSize - downloaded);\n"
+        "            }\n"
+        "            if (expectedResponseBytes > 0) {\n"
+        "                readCapacity = std::min<uint64_t>(\n"
+        "                    readCapacity, expectedResponseBytes - responseBytes);\n"
+        "            }\n"
+        "            if (readCapacity == 0) break;\n\n"
+        "            const int read = sceHttpReadData(\n"
+        "                requestId, &buffer[0], static_cast<uint32_t>(readCapacity));",
+        "PS4 sınırlı okuma çağrısı",
+    )
+
 text = text.replace(
     '#else\n    (void)expectedSize;\n    if (url.compare(0, 7, "file://") != 0) {',
     '#else\n    if (url.compare(0, 7, "file://") != 0) {',
@@ -75,4 +100,4 @@ if "if (read < wanted) break;" not in text:
     )
 
 path.write_text(text)
-print("v0.2.3 HTTP tamamlama yaması uygulandı")
+print("HTTP kesin tamamlama yaması uygulandı")
