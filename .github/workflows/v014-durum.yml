@@ -1,0 +1,39 @@
+name: v0.1.4 yayın dosyasını doğrula
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/v014-durum.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  dogrula:
+    name: Yayın varlıklarını doğrula
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kaynakları al
+        uses: actions/checkout@v4
+
+      - name: Yayın ve PKG varlığını doğrula
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          gh release view v0.1.4 --json tagName,url,publishedAt,assets > /tmp/yayin.json
+          jq -e '.assets[] | select(.name == "IV0000-PSFC00001_00-PSFORCERCLIENT00.pkg" and .state == "uploaded")' /tmp/yayin.json >/dev/null
+          jq -e '.assets[] | select(.name == "IV0000-PSFC00001_00-PSFORCERCLIENT00.pkg.sha256" and .state == "uploaded")' /tmp/yayin.json >/dev/null
+          jq '{etiket:.tagName,adres:.url,yayin_tarihi:.publishedAt,varliklar:[.assets[] | {ad:.name,boyut:.size,durum:.state,indirme_adresi:.url}]}' /tmp/yayin.json > release/durum-v014.json
+
+      - name: Doğrulama kaydını yaz ve geçici akışı kaldır
+        run: |
+          set -euo pipefail
+          rm -f .github/workflows/v014-durum.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'v0.1.4 yayın dosyalarını doğrula [skip ci]'
+          git push
