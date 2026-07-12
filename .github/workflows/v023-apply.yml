@@ -6,23 +6,21 @@ on:
     paths:
       - 'tools/v023_apply.py'
       - '.github/workflows/v023-apply.yml'
-  pull_request:
-    branches: [main]
-    paths:
-      - 'tools/v023_apply.py'
-      - '.github/workflows/v023-apply.yml'
 
 permissions:
   contents: write
 
+concurrency:
+  group: v023-kaynak-duzeltme
+  cancel-in-progress: true
+
 jobs:
   uygula:
-    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.head_ref || github.ref_name }}
+          ref: duzeltme/tamamlama-v023
           fetch-depth: 0
 
       - name: Kaynak düzeltmesini uygula
@@ -39,7 +37,8 @@ jobs:
           if [ "$durum" -ne 0 ]; then
             git add v023-run.log
             git commit -m 'v0.2.3 kaynak düzeltme tanısını kaydet' || true
-            git push origin HEAD:${{ github.head_ref || github.ref_name }}
+            git pull --rebase origin duzeltme/tamamlama-v023
+            git push origin HEAD:duzeltme/tamamlama-v023
             exit "$durum"
           fi
 
@@ -48,4 +47,5 @@ jobs:
           rm -f v023-run.log
           git add -A
           git commit -m 'Tam boyutta sunucu kapanışını beklemeden indirimi bitir'
-          git push origin HEAD:${{ github.head_ref || github.ref_name }}
+          git pull --rebase origin duzeltme/tamamlama-v023
+          git push origin HEAD:duzeltme/tamamlama-v023
