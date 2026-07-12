@@ -21,7 +21,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  RELEASE_TAG: v0.1.0
+  RELEASE_TAG: v0.1.1
+  BROKEN_RELEASE_TAG: v0.1.0
   PKG_NAME: IV0000-PSFC00001_00-PSFORCERCLIENT00.pkg
 
 jobs:
@@ -133,6 +134,16 @@ jobs:
             ${{ env.PKG_NAME }}.sha256
           if-no-files-found: warn
 
+      - name: Remove broken release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view "$BROKEN_RELEASE_TAG" >/dev/null 2>&1; then
+            gh release delete "$BROKEN_RELEASE_TAG" --cleanup-tag --yes
+          fi
+
       - name: Publish GitHub Release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         env:
@@ -142,8 +153,8 @@ jobs:
           if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release create "$RELEASE_TAG" \
               --target "$GITHUB_SHA" \
-              --title 'PSForcer v0.1.0' \
-              --notes 'İlk PSForcer test sürümü. OpenOrbis ile üretilmiş PS4 homebrew PKG dosyasını içerir.'
+              --title 'PSForcer v0.1.1 Startup Hotfix' \
+              --notes 'PS4 başlangıç çökmesi için test düzeltmesi. SDL_image açılış bağımlılığı kaldırıldı, görsel yer tutucular korundu ve /data/psforcer-startup.log başlangıç günlüğü eklendi.'
           fi
           gh release upload "$RELEASE_TAG" \
             "$PKG_NAME" "$PKG_NAME.sha256" \
