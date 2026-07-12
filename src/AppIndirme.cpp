@@ -53,7 +53,7 @@ void App::refreshCatalog() {
         return;
     }
     std::string url = readFirstLine(runtimeRoot() + "/katalog_adresi.txt");
-    if (url.empty()) url = readFirstLine(bundledPath("assets/manifest_url.txt"));
+    if (url.empty()) url = readFirstLine(bundledPath("assets/katalog_adresi.txt"));
     if (url.empty()) {
         setToast("/data/psforcer/katalog_adresi.txt dosyasına katalog bağlantısını yazın", 6500);
         return;
