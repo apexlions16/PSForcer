@@ -30,8 +30,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  YAYIN_ETIKETI: v0.1.8
-  ESKI_YAYIN_ETIKETI: v0.1.7
+  YAYIN_ETIKETI: v0.1.9
+  ESKI_YAYIN_ETIKETI: v0.1.8
   PAKET_ADI: IV0000-PSFC00001_00-PSFORCERCLIENT00.pkg
 
 jobs:
@@ -163,8 +163,8 @@ jobs:
           if ! gh release view "$YAYIN_ETIKETI" >/dev/null 2>&1; then
             gh release create "$YAYIN_ETIKETI" \
               --target "$GITHUB_SHA" \
-              --title 'PSForcer v0.1.8 Dayanıklı ve Hızlandırılmış İndirme' \
-              --notes 'Hugging Face yönlendirmeleri artık elle izlenerek Range başlığı imzalı CDN adresine korunarak aktarılır. Erken kapanan bağlantılar aynı .parca dosyasından otomatik sürdürülür. HTTP, SSL ve ağ havuzları büyütüldü; okuma tamponu 512 KiB yapıldı. Geçersiz token public dosyayı engellerse istek bir kez anonim olarak yeniden denenir.'
+              --title 'PSForcer v0.1.9 Kesintisiz Hugging Face Akışı' \
+              --notes 'Büyük paketler 64 MiB aralıklarla indirilir; imzalı Hugging Face CDN adresi sonraki aralıklarda yeniden kullanılır. Veri ilerleyen parça geçişleri artık hata sayılmaz ve aralarında yapay bekleme yapılmaz. CDN adresi geçersizleşirse ana Hugging Face adresine otomatik dönülür; Content-Range başlangıcı doğrulanır ve gerçek indirme hızı ölçülür.'
           fi
           gh release upload "$YAYIN_ETIKETI" \
             "$PAKET_ADI" "$PAKET_ADI.sha256" \
