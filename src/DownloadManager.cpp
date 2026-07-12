@@ -33,11 +33,13 @@ bool isPermanentDownloadError(const std::string& error) {
 }
 
 void waitBeforeReconnect(unsigned int attempt) {
-    const unsigned int milliseconds = std::min(4000u, 500u + attempt * 250u);
 #if defined(PSFORCER_ORBIS)
+    const unsigned int milliseconds = std::min(4000u, 500u + attempt * 250u);
     SDL_Delay(milliseconds);
 #else
-    std::this_thread::sleep_for(std::chrono::milliseconds(milliseconds));
+    // Bilgisayar sınamalarında gerçek ağ beklemesi yok; sınamayı gereksiz uzatma.
+    (void)attempt;
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
 #endif
 }
 }
@@ -220,8 +222,9 @@ void DownloadManager::run(DownloadRequest request) {
 
         if (noProgressCount >= 5) {
             std::ostringstream message;
-            message << "İndirme ilerlemedi. Sunucu kaldığı yerden devam isteğini "
-                    << "kabul etmemiş olabilir; dosya " << actualSize << " baytta kaldı";
+            message << "Dosya boyutu doğrulanamadı. İndirme ilerlemedi; sunucu "
+                    << "kaldığı yerden devam isteğini kabul etmemiş olabilir. Alınan "
+                    << actualSize << " bayt";
             lastError = message.str();
             break;
         }
