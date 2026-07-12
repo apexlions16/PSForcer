@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
-  "catalogTitle": "PSForcer",
+  "catalogTitle": "PSForcer İçerik Kütüphanesi",
   "updatedAt": "2026-07-12T00:00:00Z",
   "items": [
     {
-      "id": "neon-horizon",
-      "title": "Neon Horizon",
-      "developer": "Apex Demo Studio",
-      "genre": "Action",
-      "description": "A fast sci-fi action showcase used to preview PSForcer's catalog, package grouping and media layout. Replace the demo URLs with your Hugging Face files when they are ready.",
+      "id": "neon-ufuk",
+      "title": "Neon Ufuk",
+      "developer": "Zirve Tanıtım Stüdyosu",
+      "genre": "Aksiyon",
+      "description": "PSForcer katalog düzenini, paket gruplarını ve görsel alanlarını göstermek için hazırlanmış hızlı bir bilim kurgu aksiyon örneği. Hugging Face dosyaları hazır olduğunda örnek adresleri gerçek bağlantılarla değiştirin.",
       "releaseYear": 2026,
       "accent": "6C63FF",
       "media": {
@@ -19,8 +19,8 @@
       },
       "packages": [
         {
-          "id": "base-100",
-          "kind": "game",
+          "id": "ana-100",
+          "kind": "oyun",
           "label": "Ana Oyun",
           "version": "1.00",
           "size": 2147483648,
@@ -30,9 +30,9 @@
           "deleteAfterInstall": false
         },
         {
-          "id": "update-110",
-          "kind": "update",
-          "label": "Guncelleme 1.10",
+          "id": "guncelleme-110",
+          "kind": "guncelleme",
+          "label": "Güncelleme 1.10",
           "version": "1.10",
           "size": 536870912,
           "url": "",
@@ -41,9 +41,9 @@
           "deleteAfterInstall": false
         },
         {
-          "id": "soundtrack",
-          "kind": "extra",
-          "label": "Dijital Soundtrack",
+          "id": "muzik-albumu",
+          "kind": "ekstra",
+          "label": "Dijital Müzik Albümü",
           "version": "1.00",
           "size": 157286400,
           "url": "",
@@ -54,11 +54,11 @@
       ]
     },
     {
-      "id": "ashen-ridge",
-      "title": "Ashen Ridge",
-      "developer": "Northline Interactive",
-      "genre": "Adventure",
-      "description": "Explore a remote mountain settlement, uncover its history and manage a growing set of story expansions. This item demonstrates DLC grouping and a cinematic hero image.",
+      "id": "kul-sirti",
+      "title": "Kül Sırtı",
+      "developer": "Kuzey Çizgisi Etkileşim",
+      "genre": "Macera",
+      "description": "Uzak bir dağ yerleşimini keşfedin, geçmişini ortaya çıkarın ve büyüyen öykü ek paketlerini yönetin. Bu örnek, ek paket gruplamasını ve geniş kapak alanını gösterir.",
       "releaseYear": 2025,
       "accent": "E07A5F",
       "media": {
@@ -69,8 +69,8 @@
       },
       "packages": [
         {
-          "id": "base-100",
-          "kind": "game",
+          "id": "ana-100",
+          "kind": "oyun",
           "label": "Ana Oyun",
           "version": "1.00",
           "size": 4294967296,
@@ -80,9 +80,9 @@
           "deleteAfterInstall": false
         },
         {
-          "id": "dlc-valley",
-          "kind": "dlc",
-          "label": "Hidden Valley DLC",
+          "id": "gizli-vadi",
+          "kind": "ek-paket",
+          "label": "Gizli Vadi Ek Paketi",
           "version": "1.00",
           "size": 805306368,
           "url": "",
@@ -93,11 +93,11 @@
       ]
     },
     {
-      "id": "velocity-grid",
-      "title": "Velocity Grid",
-      "developer": "Pulse Works",
-      "genre": "Racing",
-      "description": "A clean racing-themed catalog entry with a base package, performance update and bonus car pack. Use it to test package selection and category filters.",
+      "id": "hiz-izgarasi",
+      "title": "Hız Izgarası",
+      "developer": "Nabız Atölyesi",
+      "genre": "Yarış",
+      "description": "Ana oyun, başarım güncellemesi ve ek araç paketi içeren sade bir yarış kataloğu örneği. Paket seçimini ve kategori filtrelerini denemek için kullanılır.",
       "releaseYear": 2026,
       "accent": "2A9D8F",
       "media": {
@@ -108,8 +108,8 @@
       },
       "packages": [
         {
-          "id": "base-100",
-          "kind": "game",
+          "id": "ana-100",
+          "kind": "oyun",
           "label": "Ana Oyun",
           "version": "1.00",
           "size": 3221225472,
@@ -119,9 +119,9 @@
           "deleteAfterInstall": false
         },
         {
-          "id": "update-102",
-          "kind": "update",
-          "label": "Performance Update",
+          "id": "guncelleme-102",
+          "kind": "guncelleme",
+          "label": "Başarım Güncellemesi",
           "version": "1.02",
           "size": 268435456,
           "url": "",
@@ -130,9 +130,9 @@
           "deleteAfterInstall": false
         },
         {
-          "id": "dlc-cars",
-          "kind": "dlc",
-          "label": "Bonus Car Pack",
+          "id": "ek-araclar",
+          "kind": "ek-paket",
+          "label": "Ek Araç Paketi",
           "version": "1.00",
           "size": 104857600,
           "url": "",
