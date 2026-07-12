@@ -23,11 +23,11 @@ DownloadManager::~DownloadManager() {
 
 bool DownloadManager::start(const DownloadRequest& request, std::string& error) {
     if (busy()) {
-        error = "Another download is already running";
+        error = "Başka bir indirme zaten çalışıyor";
         return false;
     }
     if (request.url.empty()) {
-        error = "Download URL is empty";
+        error = "İndirme adresi boş";
         return false;
     }
     if (worker_.joinable()) worker_.join();
@@ -45,9 +45,7 @@ bool DownloadManager::start(const DownloadRequest& request, std::string& error) 
     return true;
 }
 
-void DownloadManager::cancel() {
-    cancelRequested_.store(true);
-}
+void DownloadManager::cancel() { cancelRequested_.store(true); }
 
 void DownloadManager::reset() {
     if (busy()) return;
@@ -102,7 +100,7 @@ void DownloadManager::run(DownloadRequest request) {
         if (lower(digest) != lower(request.sha256)) {
             std::lock_guard<std::mutex> lock(mutex_);
             snapshot_.state = DownloadState::Failed;
-            snapshot_.error = "SHA-256 verification failed";
+            snapshot_.error = "SHA-256 bütünlük denetimi başarısız";
             return;
         }
     }
