@@ -1,0 +1,163 @@
+name: v0.2.3 tamamlama düzeltmesini uygula
+
+on:
+  push:
+    branches: [duzeltme/tamamlama-v023]
+    paths:
+      - '.github/workflows/v023-tamamlama-onar.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  onar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: duzeltme/tamamlama-v023
+          fetch-depth: 0
+
+      - name: Tamamlanan yanıtı EOF beklemeden kapat
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          http = Path('src/HttpClientTurkce.cpp')
+          text = http.read_text()
+
+          old = '''        bool readFailed = false;
+              while (true) {
+                  if (cancel && cancel->load()) {'''
+          new = '''        bool readFailed = false;
+              while (true) {
+                  // Bilinen dosya boyutuna veya bu HTTP yanıtının bildirilen
+                  // uzunluğuna ulaşıldığında sunucunun bağlantıyı kapatmasını
+                  // bekleme. Keep-alive yanıtları PS4'te burada süresiz bekletebiliyor.
+                  if (expectedSize > 0 && downloaded == expectedSize) {
+                      success = true;
+                      break;
+                  }
+                  if (expectedResponseBytes > 0 &&
+                      responseBytes == expectedResponseBytes) {
+                      break;
+                  }
+
+                  if (cancel && cancel->load()) {'''
+          if old not in text:
+              raise SystemExit('PS4 okuma döngüsü bulunamadı')
+          text = text.replace(old, new, 1)
+
+          old = '''#else
+              (void)expectedSize;
+              if (url.compare(0, 7, "file://") != 0) {'''
+          new = '''#else
+              if (url.compare(0, 7, "file://") != 0) {'''
+          if old not in text:
+              raise SystemExit('Masaüstü expectedSize bölümü bulunamadı')
+          text = text.replace(old, new, 1)
+
+          old = '''    uint64_t existing = resume ? fileSize(destination) : 0;
+              const uint64_t total = fileSize(sourcePath);
+              if (existing > total) existing = 0;'''
+          new = '''    uint64_t existing = resume ? fileSize(destination) : 0;
+              const uint64_t sourceSize = fileSize(sourcePath);
+              const uint64_t total = expectedSize > 0 ? expectedSize : sourceSize;
+              if (existing > total) existing = 0;'''
+          if old not in text:
+              raise SystemExit('Masaüstü toplam boyut bölümü bulunamadı')
+          text = text.replace(old, new, 1)
+
+          old = '''        const size_t read = std::fread(&buffer[0], 1, buffer.size(), input);
+                  if (read > 0 && std::fwrite(&buffer[0], 1, read, output) != read) {'''
+          new = '''        if (expectedSize > 0 && copied >= expectedSize) break;
+
+                  size_t wanted = buffer.size();
+                  if (expectedSize > 0) {
+                      wanted = static_cast<size_t>(std::min<uint64_t>(
+                          wanted, expectedSize - copied));
+                  }
+                  const size_t read = std::fread(&buffer[0], 1, wanted, input);
+                  if (read > 0 && std::fwrite(&buffer[0], 1, read, output) != read) {'''
+          if old not in text:
+              raise SystemExit('Masaüstü okuma bölümü bulunamadı')
+          text = text.replace(old, new, 1)
+
+          old = '''        copied += read;
+                  if (progress) progress(HttpProgress{copied, total});
+                  if (read < buffer.size()) break;'''
+          new = '''        copied += read;
+                  if (progress) progress(HttpProgress{copied, total});
+                  if (expectedSize > 0 && copied == expectedSize) break;
+                  if (read < wanted) break;'''
+          if old not in text:
+              raise SystemExit('Masaüstü bitiş bölümü bulunamadı')
+          text = text.replace(old, new, 1)
+          http.write_text(text)
+
+          test = Path('tests/download_manager_test.cpp')
+          text = test.read_text()
+          old = '''    if (snapshot.state != psforcer::DownloadState::Failed ||
+                  snapshot.error.find("Dosya boyutu") == std::string::npos) {
+                  std::cerr << "Yanlış dosya boyutu yakalanamadı\\n";
+                  return 1;
+              }
+
+              manager.stopAndWait();'''
+          new = '''    if (snapshot.state != psforcer::DownloadState::Failed ||
+                  snapshot.error.find("Dosya boyutu") == std::string::npos) {
+                  std::cerr << "Yanlış dosya boyutu yakalanamadı\\n";
+                  return 1;
+              }
+              manager.reset();
+
+              // Kaynak beklenen boyuttan daha büyük olsa bile istemci tam hedef
+              // baytına ulaştığında EOF beklemeden tamamlanmalıdır.
+              std::remove(destination.c_str());
+              request.jobId = 3;
+              request.expectedSize = payload.size() - 12345;
+              request.resume = false;
+              if (!manager.start(request, error)) {
+                  std::cerr << error << '\\n';
+                  return 1;
+              }
+              snapshot = waitFor(manager);
+              if (snapshot.state != psforcer::DownloadState::Completed ||
+                  psforcer::fileSize(destination) != request.expectedSize) {
+                  std::cerr << "Tam hedef boyutunda EOF beklemeden tamamlanamadı: "
+                            << snapshot.error << '\\n';
+                  return 1;
+              }
+
+              manager.stopAndWait();'''
+          if old not in text:
+              raise SystemExit('İndirme sınaması ekleme noktası bulunamadı')
+          test.write_text(text.replace(old, new, 1))
+
+          make = Path('Makefile')
+          text = make.read_text()
+          text = text.replace('paket bilgileri - v0.22', 'paket bilgileri - v0.23', 1)
+          text = text.replace('VERSION     := 0.22', 'VERSION     := 0.23', 1)
+          make.write_text(text)
+
+          release = Path('.github/workflows/build-pkg-release.yml')
+          text = release.read_text()
+          text = text.replace('YAYIN_ETIKETI: v0.2.2', 'YAYIN_ETIKETI: v0.2.3', 1)
+          text = text.replace('ESKI_YAYIN_ETIKETI: v0.2.1', 'ESKI_YAYIN_ETIKETI: v0.2.2', 1)
+          text = text.replace('PSForcer v0.2.2 Tek Oturumlu İndirme',
+                              'PSForcer v0.2.3 Kesin Tamamlama', 1)
+          old_note = 'PS4 üzerinde güvenilir olmadığı görülen sceKernelPwrite yolu kaldırıldı. İndirme boyunca tek bir standart libc FILE akışı açık tutulur, tampon kapatılır ve bağlantı kesilse bile aynı kesin bellek konumundan Range isteğiyle devam edilir. stat yalnızca dosya kapatıldıktan sonra doğrulama amacıyla kullanılır; böylece bağlantı yenilemelerinde sayaç ve dosya konumu geriye dönmez.'
+          new_note = 'İndirici, katalogdaki kesin dosya boyutuna veya HTTP Content-Length/Content-Range uzunluğuna ulaştığı anda sunucunun keep-alive bağlantısını kapatmasını beklemeden yanıtı tamamlar. Böylece ilerleme çubuğunun 1.4 GB / 1.4 GB noktasında İNDİRİLİYOR durumunda kalması giderildi. Tam boyutta EOF beklememe davranışı otomatik sınamayla doğrulanır.'
+          if old_note not in text:
+              raise SystemExit('Yayın notu bulunamadı')
+          release.write_text(text.replace(old_note, new_note, 1))
+          PY
+
+          rm -f .github/workflows/v023-tamamlama-onar.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Tam boyutta sunucu kapanışını beklemeden indirimi bitir'
+          git push origin HEAD:duzeltme/tamamlama-v023
