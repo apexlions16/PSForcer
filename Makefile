@@ -5,7 +5,7 @@ TITLE_ID    := PSFC00001
 CONTENT_ID  := IV0000-PSFC00001_00-PSFORCERCLIENT00
 
 LIBS        := -lc -lkernel -lc++ -lSceUserService -lSceVideoOut -lSceAudioOut -lScePad -lSceSysmodule -lSDL2 -lSDL2_image -lSceNet -lSceSsl -lSceHttp
-EXTRAFLAGS  := -std=c++11 -DPSFORCER_ORBIS=1
+EXTRAFLAGS  := -std=gnu++11 -D_GNU_SOURCE -DPSFORCER_ORBIS=1
 
 TOOLCHAIN   := $(OO_PS4_TOOLCHAIN)
 PROJDIR     := src
