@@ -1,6 +1,6 @@
 # PSForcer OpenOrbis paket bilgileri
 TITLE       := PSForcer
-VERSION     := 0.16
+VERSION     := 0.17
 TITLE_ID    := PSFC00001
 CONTENT_ID  := IV0000-PSFC00001_00-PSFORCERCLIENT00
 
@@ -11,7 +11,7 @@ TOOLCHAIN   := $(OO_PS4_TOOLCHAIN)
 PROJDIR     := src
 INTDIR      := x64/Debug
 MEDIA_FLAT  := assets/pt-cover.jpg assets/pt-header.jpg assets/pt-screenshot-1.jpg assets/pt-screenshot-2.jpg assets/pt-screenshot-3.jpg
-ASSETS      := assets/catalog.json assets/katalog_adresi.txt $(MEDIA_FLAT)
+ASSETS      := assets/catalog.json assets/katalog_adresi.txt assets/hf_token.txt $(MEDIA_FLAT)
 LIBMODULES  := $(wildcard sce_module/*)
 CPPFILES    := $(shell find $(PROJDIR) -name '*.cpp')
 OBJS        := $(patsubst $(PROJDIR)/%.cpp,$(INTDIR)/%.o,$(CPPFILES))
