@@ -63,6 +63,21 @@ bool App::initialize(std::string& error) {
     ensureDirectory(runtimeRoot() + "/indirmeler");
     ensureDirectory(runtimeRoot() + "/gorseller");
 
+    // Token hiçbir zaman GitHub'a gerçek değer olarak yazılmaz. Uygulama ilk açılışta
+    // PS4 veri klasöründe düzenlenebilir bir şablon oluşturur.
+    const std::string tokenPath = runtimeRoot() + "/hf_token.txt";
+    if (!fileExists(tokenPath)) {
+        FILE* tokenFile = std::fopen(tokenPath.c_str(), "wb");
+        if (tokenFile) {
+            const std::string templateLine = readFirstLine(bundledPath("assets/hf_token.txt"));
+            if (!templateLine.empty()) {
+                std::fwrite(templateLine.data(), 1, templateLine.size(), tokenFile);
+            }
+            std::fputc('\n', tokenFile);
+            std::fclose(tokenFile);
+        }
+    }
+
     std::string mediaError;
     mediaCache_.initialize(runtimeRoot() + "/gecici-medya", mediaError);
     ui_.setMediaResolver([this](const std::string& path) {
