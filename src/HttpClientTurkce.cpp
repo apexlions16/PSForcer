@@ -37,6 +37,7 @@ int gNetPoolId = 0;
 int gSslContextId = 0;
 int gHttpContextId = 0;
 unsigned int gHttpUsers = 0;
+const uint64_t kPackageRangeSize = 64ULL * 1024ULL * 1024ULL;
 
 bool isHuggingFaceUrl(const std::string& url) {
     return url.compare(0, 23, "https://huggingface.co/") == 0;
@@ -107,11 +108,30 @@ std::string absoluteRedirectUrl(const std::string& current, const std::string& l
     return current.substr(0, lastSlash + 1) + location;
 }
 
-uint64_t contentRangeTotal(const std::string& value) {
-    const size_t slash = value.rfind('/');
-    if (slash == std::string::npos || slash + 1 >= value.size() || value[slash + 1] == '*')
-        return 0;
-    return static_cast<uint64_t>(std::strtoull(value.substr(slash + 1).c_str(), NULL, 10));
+struct ContentRangeInfo {
+    bool valid;
+    uint64_t start;
+    uint64_t end;
+    uint64_t total;
+    ContentRangeInfo() : valid(false), start(0), end(0), total(0) {}
+};
+
+ContentRangeInfo parseContentRange(const std::string& value) {
+    ContentRangeInfo info;
+    const size_t space = value.find(' ');
+    const size_t dash = value.find('-', space == std::string::npos ? 0 : space + 1);
+    const size_t slash = value.find('/', dash == std::string::npos ? 0 : dash + 1);
+    if (dash == std::string::npos || slash == std::string::npos) return info;
+
+    const size_t startPos = space == std::string::npos ? 0 : space + 1;
+    if (startPos >= dash || dash + 1 >= slash) return info;
+
+    info.start = static_cast<uint64_t>(std::strtoull(value.substr(startPos, dash - startPos).c_str(), NULL, 10));
+    info.end = static_cast<uint64_t>(std::strtoull(value.substr(dash + 1, slash - dash - 1).c_str(), NULL, 10));
+    if (slash + 1 < value.size() && value[slash + 1] != '*')
+        info.total = static_cast<uint64_t>(std::strtoull(value.substr(slash + 1).c_str(), NULL, 10));
+    info.valid = info.end >= info.start;
+    return info;
 }
 
 void closeRequestObjects(int& requestId, int& connectionId) {
@@ -200,13 +220,15 @@ void HttpClient::shutdown() {
         gNetPoolId = 0;
     }
     httpContextId_ = sslContextId_ = netPoolId_ = 0;
+    cachedSourceUrl_.clear();
+    cachedResolvedUrl_.clear();
 #endif
     initialized_ = false;
 }
 
 bool HttpClient::download(const std::string& url, const std::string& destination, bool resume,
-                          const HttpProgressCallback& progress, std::atomic<bool>* cancel,
-                          std::string& error) {
+                          uint64_t expectedSize, const HttpProgressCallback& progress,
+                          std::atomic<bool>* cancel, std::string& error) {
     if (!initialized_ && !initialize(error)) return false;
     const size_t slash = destination.find_last_of('/');
     if (slash != std::string::npos && !ensureDirectory(destination.substr(0, slash))) {
@@ -226,17 +248,19 @@ bool HttpClient::download(const std::string& url, const std::string& destination
     size_t responseLength = 0;
     uint64_t total = 0;
     uint64_t downloaded = 0;
-    uint64_t rangeTotal = 0;
-    std::string currentUrl = url;
+    uint64_t requestedStart = existing;
+    uint64_t requestedEnd = 0;
+    bool rangeRequested = false;
+    const bool cachedAvailable = cachedSourceUrl_ == url && !cachedResolvedUrl_.empty();
+    bool cacheAttempt = cachedAvailable;
+    std::string currentUrl = cachedAvailable ? cachedResolvedUrl_ : url;
     bool allowToken = true;
     int redirectCount = 0;
     int authFallbackCount = 0;
 
-    // Daha büyük blok, libSceHttp çağrı sayısını düşürür ve PS4 üzerinde
-    // tek bağlantılı indirme hızını belirgin biçimde iyileştirir.
     std::vector<uint8_t> buffer(512 * 1024);
 
-    templateId = sceHttpCreateTemplate(httpContextId_, "PSForcer/0.18", ORBIS_HTTP_VERSION_1_1, 1);
+    templateId = sceHttpCreateTemplate(httpContextId_, "PSForcer/0.19", ORBIS_HTTP_VERSION_1_1, 1);
     if (templateId < 0) {
         error = PSF_SABLON;
         return false;
@@ -256,8 +280,6 @@ bool HttpClient::download(const std::string& url, const std::string& destination
             goto cleanup;
         }
 
-        // Yönlendirmeyi kendimiz izliyoruz. Böylece Range başlığı Hugging Face'in
-        // imzalı CDN adresine geçerken kaybolmuyor.
         psfHttpSetAutoRedirect(requestId, 0);
         psfHttpSetRecvBlockSize(requestId, 512 * 1024);
         psfHttpSetRecvTimeOut(requestId, 60 * 1000 * 1000);
@@ -279,11 +301,18 @@ bool HttpClient::download(const std::string& url, const std::string& destination
             }
         }
 
-        if (existing > 0) {
+        requestedStart = existing;
+        rangeRequested = false;
+        if ((existing > 0) || (expectedSize > kPackageRangeSize)) {
             std::ostringstream range;
-            range << "bytes=" << existing << '-';
-            if (sceHttpAddRequestHeader(requestId, "Range", range.str().c_str(), 0) < 0)
-                existing = 0;
+            range << "bytes=" << requestedStart << '-';
+            if (expectedSize > 0 && requestedStart < expectedSize) {
+                requestedEnd = std::min<uint64_t>(expectedSize - 1,
+                                                  requestedStart + kPackageRangeSize - 1);
+                range << requestedEnd;
+            }
+            if (sceHttpAddRequestHeader(requestId, "Range", range.str().c_str(), 0) >= 0)
+                rangeRequested = true;
         }
 
         if (sceHttpSendRequest(requestId, NULL, 0) < 0) {
@@ -294,6 +323,19 @@ bool HttpClient::download(const std::string& url, const std::string& destination
         if (sceHttpGetStatusCode(requestId, &statusCode) < 0) {
             error = PSF_DURUM;
             goto cleanup;
+        }
+
+        if (cacheAttempt && (statusCode == 401 || statusCode == 403 ||
+                             statusCode == 404 || statusCode == 416)) {
+            cachedSourceUrl_.clear();
+            cachedResolvedUrl_.clear();
+            cacheAttempt = false;
+            currentUrl = url;
+            redirectCount = 0;
+            allowToken = true;
+            authFallbackCount = 0;
+            closeRequestObjects(requestId, connectionId);
+            continue;
         }
 
         // Geçersiz/eski token public bir dosyayı engellemesin: bir kez anonim dene.
@@ -322,7 +364,8 @@ bool HttpClient::download(const std::string& url, const std::string& destination
     }
 
     if (statusCode == 416 && existing > 0) {
-        success = true;
+        success = expectedSize > 0 && existing >= expectedSize;
+        if (!success) error = "Sunucu kaldığı yerden devam aralığını reddetti (416)";
         goto cleanup;
     }
 
@@ -339,14 +382,26 @@ bool HttpClient::download(const std::string& url, const std::string& destination
         goto cleanup;
     }
 
-    // Sunucu Range isteğini yok saydıysa dosyayı baştan, bozmadan yaz.
-    if (statusCode == 200 && existing > 0) existing = 0;
+    const ContentRangeInfo contentRange = parseContentRange(responseHeaderValue(requestId, "Content-Range"));
+    if (statusCode == 206 && contentRange.valid && rangeRequested &&
+        contentRange.start != requestedStart) {
+        std::ostringstream message;
+        message << "Sunucu yanlış aralıktan veri gönderdi. Beklenen başlangıç "
+                << requestedStart << ", gelen " << contentRange.start;
+        error = message.str();
+        goto cleanup;
+    }
+
+    if (statusCode == 200 && existing > 0) {
+        // Kaldığı yerden devam isteği yok sayıldıysa bozuk veri eklemeyelim.
+        // Asıl Hugging Face adresinden gelen 200 tam dosya akışı olabilir; baştan yaz.
+        existing = 0;
+    }
 
     if (sceHttpGetResponseContentLength(requestId, &contentLengthType, &responseLength) >= 0)
         total = existing + static_cast<uint64_t>(responseLength);
-
-    rangeTotal = contentRangeTotal(responseHeaderValue(requestId, "Content-Range"));
-    if (rangeTotal > 0) total = rangeTotal;
+    if (contentRange.valid && contentRange.total > 0) total = contentRange.total;
+    if (expectedSize > 0) total = expectedSize;
 
     output = std::fopen(destination.c_str(), existing > 0 ? "ab" : "wb");
     if (!output) {
@@ -390,6 +445,11 @@ bool HttpClient::download(const std::string& url, const std::string& destination
         error = PSF_YAZMA;
         goto cleanup;
     }
+
+    if (currentUrl != url) {
+        cachedSourceUrl_ = url;
+        cachedResolvedUrl_ = currentUrl;
+    }
     success = true;
 
 cleanup:
@@ -398,6 +458,7 @@ cleanup:
     if (templateId > 0) sceHttpDeleteTemplate(templateId);
     return success;
 #else
+    (void)expectedSize;
     if (url.compare(0, 7, "file://") != 0) {
         error = PSF_YEREL;
         return false;
