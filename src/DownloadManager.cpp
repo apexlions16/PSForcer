@@ -30,7 +30,10 @@ bool isPermanentDownloadError(const std::string& error) {
            message.find("hedef dosya") != std::string::npos ||
            message.find("dosyaya yaz") != std::string::npos ||
            message.find("klasör") != std::string::npos ||
-           message.find("yanlış aralıktan") != std::string::npos;
+           message.find("yanlış aralıktan") != std::string::npos ||
+           message.find("kalıcı yazma") != std::string::npos ||
+           message.find("kalıcı dosya") != std::string::npos ||
+           message.find("dosya yazımı geriye düştü") != std::string::npos;
 }
 
 uint64_t monotonicMilliseconds() {
@@ -172,8 +175,8 @@ void DownloadManager::run(DownloadRequest request) {
     bool firstAttempt = true;
     bool complete = false;
 
-    // Hugging Face/Xet büyük dosyayı birden fazla HTTP aralığı halinde verebilir.
-    // Veri ilerlediyse bu bir hata değildir: gecikmeden sonraki aralığa geçilir.
+    // Sunucu akışı erken kapatırsa yalnızca diskte gerçekten kalıcılaşmış
+    // bayt sayısından devam edilir. Ekrandaki sayaç hiçbir zaman azaltılmaz.
     while (!cancelRequested_.load()) {
         error.clear();
         const bool requestFinished = client_.download(
@@ -189,12 +192,14 @@ void DownloadManager::run(DownloadRequest request) {
                     : 0;
 
                 std::lock_guard<std::mutex> lock(mutex_);
-                snapshot_.downloaded = progress.downloaded;
+                snapshot_.downloaded = std::max(snapshot_.downloaded,
+                                                progress.downloaded);
                 snapshot_.total = request.expectedSize > 0
                     ? request.expectedSize
                     : progress.total;
-                if (elapsed >= 250)
+                if (elapsed >= 250) {
                     snapshot_.bytesPerSecond = sessionBytes * 1000ULL / elapsed;
+                }
                 snapshot_.status.clear();
                 snapshot_.error.clear();
             },
@@ -203,10 +208,18 @@ void DownloadManager::run(DownloadRequest request) {
         firstAttempt = false;
 
         const uint64_t actualSize = fileSize(request.destination);
+        if (actualSize < previousSize) {
+            std::ostringstream message;
+            message << "Dosya yazımı geriye düştü. Önceki kalıcı boyut "
+                    << previousSize << " bayt, yeni boyut " << actualSize << " bayt";
+            lastError = message.str();
+            break;
+        }
+
         const bool madeProgress = actualSize > previousSize;
         {
             std::lock_guard<std::mutex> lock(mutex_);
-            snapshot_.downloaded = actualSize;
+            snapshot_.downloaded = std::max(snapshot_.downloaded, actualSize);
             if (request.expectedSize > 0) snapshot_.total = request.expectedSize;
         }
 
@@ -239,8 +252,8 @@ void DownloadManager::run(DownloadRequest request) {
                 snapshot_.reconnects = reconnectCount;
                 snapshot_.status.clear();
             }
-            // Sağlıklı parça tamamlandı. Eski sürüm burada her defasında 0,5–4 sn
-            // beklediği için yüzlerce aralıkta indirme yapay biçimde yavaşlıyordu.
+            // Bağlantı kesilmiş olsa bile veri kalıcı dosyada ilerlediyse
+            // gecikmeden yeni Range isteğine geç.
             continue;
         }
 
@@ -284,7 +297,9 @@ void DownloadManager::run(DownloadRequest request) {
     }
 
     if (!complete) {
-        if (lastError.empty()) lastError = error.empty() ? "İndirme tamamlanamadı" : error;
+        if (lastError.empty()) {
+            lastError = error.empty() ? "İndirme tamamlanamadı" : error;
+        }
         std::lock_guard<std::mutex> lock(mutex_);
         snapshot_.state = DownloadState::Failed;
         snapshot_.status.clear();
@@ -300,7 +315,7 @@ void DownloadManager::run(DownloadRequest request) {
                     << request.expectedSize << " bayt, alınan "
                     << actualSize << " bayt";
             std::lock_guard<std::mutex> lock(mutex_);
-            snapshot_.downloaded = actualSize;
+            snapshot_.downloaded = std::max(snapshot_.downloaded, actualSize);
             snapshot_.total = request.expectedSize;
             snapshot_.state = DownloadState::Failed;
             snapshot_.status.clear();
@@ -334,7 +349,8 @@ void DownloadManager::run(DownloadRequest request) {
     }
 
     std::lock_guard<std::mutex> lock(mutex_);
-    snapshot_.downloaded = fileSize(request.destination);
+    snapshot_.downloaded = std::max(snapshot_.downloaded,
+                                    fileSize(request.destination));
     if (snapshot_.total == 0) snapshot_.total = snapshot_.downloaded;
     snapshot_.state = DownloadState::Completed;
     snapshot_.status.clear();
