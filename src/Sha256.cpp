@@ -18,29 +18,18 @@ const uint32_t kRoundConstants[64] = {
     0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,
     0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
 };
-
-inline uint32_t rotateRight(uint32_t value, uint32_t count) {
-    return (value >> count) | (value << (32 - count));
-}
-
+inline uint32_t rotateRight(uint32_t value, uint32_t count) { return (value >> count) | (value << (32 - count)); }
 inline uint32_t choose(uint32_t e, uint32_t f, uint32_t g) { return (e & f) ^ (~e & g); }
 inline uint32_t majority(uint32_t a, uint32_t b, uint32_t c) { return (a & b) ^ (a & c) ^ (b & c); }
 inline uint32_t bigSigma0(uint32_t x) { return rotateRight(x, 2) ^ rotateRight(x, 13) ^ rotateRight(x, 22); }
 inline uint32_t bigSigma1(uint32_t x) { return rotateRight(x, 6) ^ rotateRight(x, 11) ^ rotateRight(x, 25); }
 inline uint32_t smallSigma0(uint32_t x) { return rotateRight(x, 7) ^ rotateRight(x, 18) ^ (x >> 3); }
 inline uint32_t smallSigma1(uint32_t x) { return rotateRight(x, 17) ^ rotateRight(x, 19) ^ (x >> 10); }
-}  // namespace
+}
 
-Sha256::Sha256()
-    : bitLength_(0), bufferLength_(0), finalized_(false) {
-    state_[0] = 0x6a09e667;
-    state_[1] = 0xbb67ae85;
-    state_[2] = 0x3c6ef372;
-    state_[3] = 0xa54ff53a;
-    state_[4] = 0x510e527f;
-    state_[5] = 0x9b05688c;
-    state_[6] = 0x1f83d9ab;
-    state_[7] = 0x5be0cd19;
+Sha256::Sha256() : bitLength_(0), bufferLength_(0), finalized_(false) {
+    state_[0] = 0x6a09e667; state_[1] = 0xbb67ae85; state_[2] = 0x3c6ef372; state_[3] = 0xa54ff53a;
+    state_[4] = 0x510e527f; state_[5] = 0x9b05688c; state_[6] = 0x1f83d9ab; state_[7] = 0x5be0cd19;
     std::memset(buffer_, 0, sizeof(buffer_));
 }
 
@@ -48,36 +37,23 @@ void Sha256::update(const uint8_t* data, size_t length) {
     if (finalized_) return;
     for (size_t i = 0; i < length; ++i) {
         buffer_[bufferLength_++] = data[i];
-        if (bufferLength_ == 64) {
-            transform(buffer_);
-            bitLength_ += 512;
-            bufferLength_ = 0;
-        }
+        if (bufferLength_ == 64) { transform(buffer_); bitLength_ += 512; bufferLength_ = 0; }
     }
 }
 
-void Sha256::update(const std::string& data) {
-    update(reinterpret_cast<const uint8_t*>(data.data()), data.size());
-}
+void Sha256::update(const std::string& data) { update(reinterpret_cast<const uint8_t*>(data.data()), data.size()); }
 
 std::string Sha256::finalHex() {
     if (!finalized_) {
         size_t i = bufferLength_;
         buffer_[i++] = 0x80;
-        if (i > 56) {
-            while (i < 64) buffer_[i++] = 0;
-            transform(buffer_);
-            i = 0;
-        }
+        if (i > 56) { while (i < 64) buffer_[i++] = 0; transform(buffer_); i = 0; }
         while (i < 56) buffer_[i++] = 0;
         bitLength_ += static_cast<uint64_t>(bufferLength_) * 8;
-        for (int shift = 56; shift >= 0; shift -= 8) {
-            buffer_[i++] = static_cast<uint8_t>((bitLength_ >> shift) & 0xFF);
-        }
+        for (int shift = 56; shift >= 0; shift -= 8) buffer_[i++] = static_cast<uint8_t>((bitLength_ >> shift) & 0xFF);
         transform(buffer_);
         finalized_ = true;
     }
-
     std::ostringstream output;
     output << std::hex << std::setfill('0');
     for (int i = 0; i < 8; ++i) output << std::setw(8) << state_[i];
@@ -86,10 +62,7 @@ std::string Sha256::finalHex() {
 
 bool Sha256::fileHex(const std::string& path, std::string& digest, std::string& error) {
     FILE* file = std::fopen(path.c_str(), "rb");
-    if (!file) {
-        error = "Unable to open file for SHA-256: " + path;
-        return false;
-    }
+    if (!file) { error = "SHA-256 için dosya açılamadı: " + path; return false; }
     Sha256 sha;
     uint8_t buffer[64 * 1024];
     while (true) {
@@ -98,7 +71,7 @@ bool Sha256::fileHex(const std::string& path, std::string& digest, std::string& 
         if (read < sizeof(buffer)) {
             if (std::ferror(file)) {
                 std::fclose(file);
-                error = "Read error while calculating SHA-256";
+                error = "SHA-256 hesaplanırken dosya okuma hatası oluştu";
                 return false;
             }
             break;
@@ -117,40 +90,16 @@ void Sha256::transform(const uint8_t block[64]) {
                    (static_cast<uint32_t>(block[i * 4 + 2]) << 8) |
                    static_cast<uint32_t>(block[i * 4 + 3]);
     }
-    for (int i = 16; i < 64; ++i) {
-        words[i] = smallSigma1(words[i - 2]) + words[i - 7] + smallSigma0(words[i - 15]) + words[i - 16];
-    }
-
-    uint32_t a = state_[0];
-    uint32_t b = state_[1];
-    uint32_t c = state_[2];
-    uint32_t d = state_[3];
-    uint32_t e = state_[4];
-    uint32_t f = state_[5];
-    uint32_t g = state_[6];
-    uint32_t h = state_[7];
-
+    for (int i = 16; i < 64; ++i) words[i] = smallSigma1(words[i - 2]) + words[i - 7] + smallSigma0(words[i - 15]) + words[i - 16];
+    uint32_t a = state_[0], b = state_[1], c = state_[2], d = state_[3];
+    uint32_t e = state_[4], f = state_[5], g = state_[6], h = state_[7];
     for (int i = 0; i < 64; ++i) {
         const uint32_t temp1 = h + bigSigma1(e) + choose(e, f, g) + kRoundConstants[i] + words[i];
         const uint32_t temp2 = bigSigma0(a) + majority(a, b, c);
-        h = g;
-        g = f;
-        f = e;
-        e = d + temp1;
-        d = c;
-        c = b;
-        b = a;
-        a = temp1 + temp2;
+        h = g; g = f; f = e; e = d + temp1; d = c; c = b; b = a; a = temp1 + temp2;
     }
-
-    state_[0] += a;
-    state_[1] += b;
-    state_[2] += c;
-    state_[3] += d;
-    state_[4] += e;
-    state_[5] += f;
-    state_[6] += g;
-    state_[7] += h;
+    state_[0] += a; state_[1] += b; state_[2] += c; state_[3] += d;
+    state_[4] += e; state_[5] += f; state_[6] += g; state_[7] += h;
 }
 
 }  // namespace psforcer
