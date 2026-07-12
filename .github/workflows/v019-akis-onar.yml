@@ -25,16 +25,13 @@ jobs:
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
+          import re
 
           http = Path('src/HttpClientTurkce.cpp')
           text = http.read_text()
-          old = '''    uint64_t requestedStart = existing;
-              uint64_t requestedEnd = 0;
-              bool rangeRequested = false;'''
-          new = '''    uint64_t requestedStart = existing;
-              uint64_t requestedEnd = 0;
-              ContentRangeInfo contentRange;
-              bool rangeRequested = false;'''
+
+          old = "    uint64_t requestedEnd = 0;\n    bool rangeRequested = false;"
+          new = "    uint64_t requestedEnd = 0;\n    ContentRangeInfo contentRange;\n    bool rangeRequested = false;"
           if old not in text:
               raise SystemExit('ContentRange bildirim noktası bulunamadı')
           text = text.replace(old, new, 1)
@@ -45,14 +42,18 @@ jobs:
               raise SystemExit('ContentRange atama noktası bulunamadı')
           text = text.replace(old, new, 1)
 
-          old = '''        if (cacheAttempt && (statusCode == 401 || statusCode == 403 ||
-                                     statusCode == 404 || statusCode == 416)) {'''
-          new = '''        if (cacheAttempt && (statusCode == 401 || statusCode == 403 ||
-                                     statusCode == 404 || statusCode == 416 ||
-                                     (statusCode == 200 && existing > 0 && rangeRequested))) {'''
-          if old not in text:
+          pattern = re.compile(
+              r'        if \(cacheAttempt && \(statusCode == 401 \|\| statusCode == 403 \|\|\n'
+              r'                             statusCode == 404 \|\| statusCode == 416\)\) \{'
+          )
+          replacement = (
+              '        if (cacheAttempt && (statusCode == 401 || statusCode == 403 ||\n'
+              '                             statusCode == 404 || statusCode == 416 ||\n'
+              '                             (statusCode == 200 && existing > 0 && rangeRequested))) {'
+          )
+          text, count = pattern.subn(replacement, text, count=1)
+          if count != 1:
               raise SystemExit('CDN önbellek yenileme koşulu bulunamadı')
-          text = text.replace(old, new, 1)
           http.write_text(text)
 
           ui = Path('src/Ui.cpp')
