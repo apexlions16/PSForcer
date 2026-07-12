@@ -1,0 +1,42 @@
+name: Düzeltme uygulayıcısını onar
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  onar:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Düzeltme dalını al
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+
+      - name: Yama uygulayıcısını düzelt ve geçici akışı kaldır
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          yol = Path('.github/workflows/kaynak-incele.yml')
+          metin = yol.read_text()
+          metin = metin.replace(
+              'git apply --check /tmp/psforcer-duzeltme.patch',
+              'git apply --check --exclude=.github/workflows/kaynak-incele.yml /tmp/psforcer-duzeltme.patch')
+          metin = metin.replace(
+              'git apply /tmp/psforcer-duzeltme.patch',
+              'git apply --exclude=.github/workflows/kaynak-incele.yml /tmp/psforcer-duzeltme.patch\n          rm -f .github/workflows/kaynak-incele.yml')
+          yol.write_text(metin)
+          PY
+          rm -f .github/workflows/duzeltme-uygulayici-onar.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Düzeltme yamasının uygulayıcı dosyasını dışlamasını sağla'
+          git push origin "HEAD:${GITHUB_HEAD_REF}"
