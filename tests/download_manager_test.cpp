@@ -15,9 +15,15 @@ bool terminal(psforcer::DownloadState state) {
            state == psforcer::DownloadState::Cancelled;
 }
 
-psforcer::DownloadSnapshot waitFor(psforcer::DownloadManager& manager) {
+psforcer::DownloadSnapshot waitFor(psforcer::DownloadManager& manager,
+                                   bool* geriyeSardi = NULL) {
+    uint64_t onceki = 0;
     for (int i = 0; i < 500; ++i) {
         psforcer::DownloadSnapshot snapshot = manager.snapshot();
+        if (geriyeSardi && snapshot.downloaded < onceki) {
+            *geriyeSardi = true;
+        }
+        if (snapshot.downloaded > onceki) onceki = snapshot.downloaded;
         if (terminal(snapshot.state)) return snapshot;
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
@@ -28,10 +34,15 @@ psforcer::DownloadSnapshot waitFor(psforcer::DownloadManager& manager) {
 int main() {
     const std::string source = "indirme-kaynak.bin";
     const std::string destination = "indirme-hedef.bin.parca";
-    const std::string payload(256 * 1024, 'P');
+    const std::string payload(2 * 1024 * 1024, 'P');
     {
         std::ofstream output(source.c_str(), std::ios::binary);
         output.write(payload.data(), static_cast<std::streamsize>(payload.size()));
+    }
+    {
+        // Gerçek PS4 kullanımındaki yarım .parca dosyasını taklit et.
+        std::ofstream output(destination.c_str(), std::ios::binary);
+        output.write(payload.data(), 64 * 1024);
     }
 
     psforcer::DownloadManager manager;
@@ -49,10 +60,14 @@ int main() {
         std::cerr << error << '\n';
         return 1;
     }
-    psforcer::DownloadSnapshot snapshot = waitFor(manager);
+
+    bool geriyeSardi = false;
+    psforcer::DownloadSnapshot snapshot = waitFor(manager, &geriyeSardi);
     if (snapshot.state != psforcer::DownloadState::Completed ||
-        psforcer::fileSize(destination) != payload.size()) {
-        std::cerr << "İndirme tamamlanamadı: " << snapshot.error << '\n';
+        psforcer::fileSize(destination) != payload.size() ||
+        geriyeSardi) {
+        std::cerr << "İndirme tamamlanamadı veya sayaç geriye gitti: "
+                  << snapshot.error << '\n';
         return 1;
     }
     manager.reset();
