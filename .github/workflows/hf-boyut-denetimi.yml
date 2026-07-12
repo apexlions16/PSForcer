@@ -1,0 +1,41 @@
+name: Hugging Face paket boyutunu denetle
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  boyut-denetimi:
+    name: P.T. paket boyutunu ölç
+    runs-on: ubuntu-latest
+    steps:
+      - name: Hugging Face dosya bilgisini oku
+        shell: bash
+        run: |
+          set -euo pipefail
+          url='https://huggingface.co/datasets/glm-labs/entroylab/resolve/main/PPCH4/CUSA01127-USA.pkg'
+          api='https://huggingface.co/api/datasets/glm-labs/entroylab/tree/main/PPCH4?recursive=false&expand=true'
+
+          echo '--- Hugging Face API yanıtı ---'
+          api_yaniti="$(curl --fail --silent --show-error --location --retry 3 "$api")"
+          echo "$api_yaniti" | jq .
+
+          api_boyutu="$(echo "$api_yaniti" | jq -r '.[] | select(.path == "PPCH4/CUSA01127-USA.pkg") | .size // empty' | head -n 1)"
+
+          echo '--- HTTP başlıkları ---'
+          basliklar="$(curl --silent --show-error --location --head --retry 3 -H 'Range: bytes=0-0' "$url")"
+          echo "$basliklar"
+
+          aralik_boyutu="$(printf '%s\n' "$basliklar" | tr -d '\r' | awk 'BEGIN{IGNORECASE=1} /^content-range:/ {split($3,a,"/"); print a[2]}' | tail -n 1)"
+          bagli_boyut="$(printf '%s\n' "$basliklar" | tr -d '\r' | awk 'BEGIN{IGNORECASE=1} /^x-linked-size:/ {print $2}' | tail -n 1)"
+          icerik_boyutu="$(printf '%s\n' "$basliklar" | tr -d '\r' | awk 'BEGIN{IGNORECASE=1} /^content-length:/ {print $2}' | tail -n 1)"
+
+          boyut="${api_boyutu:-${aralik_boyutu:-${bagli_boyut:-$icerik_boyutu}}}"
+          test -n "$boyut"
+          test "$boyut" -gt 0
+
+          gib="$(awk -v b="$boyut" 'BEGIN { printf "%.3f", b / 1024 / 1024 / 1024 }')"
+          mib="$(awk -v b="$boyut" 'BEGIN { printf "%.2f", b / 1024 / 1024 }')"
+          echo "PT_PAKET_BOYUT_BAYT=$boyut"
+          echo "PT_PAKET_BOYUT_MIB=$mib"
+          echo "PT_PAKET_BOYUT_GIB=$gib"
