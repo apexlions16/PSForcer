@@ -30,7 +30,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  YAYIN_ETIKETI: v0.2.8
+  YAYIN_ETIKETI: v0.2.9
   PAKET_ADI: IV0000-PSFC00001_00-PSFORCERCLIENT00.pkg
 
 jobs:
@@ -152,8 +152,8 @@ jobs:
           if ! gh release view "$YAYIN_ETIKETI" >/dev/null 2>&1; then
             gh release create "$YAYIN_ETIKETI" \
               --target "$GITHUB_SHA" \
-              --title 'PSForcer v0.2.8 BGFT Çökme Düzeltmesi' \
-              --notes 'İndirme düğmesine basıldığında oluşan uygulama çökmesi düzeltildi. PS4 BGFT ve UserService fonksiyonları çağrılmadan önce gerekli çalışma zamanı sistem modülleri artık açıkça yükleniyor. Büyük PKG yine doğrudan PS4 sistem kuyruğuna indirilip kuruluyor; /data alanında ikinci kopya oluşturulmuyor. Olası cihaz-özel sorunlarda son güvenli aşamayı göstermek için /data/psforcer/bgft_tani.log tanı kaydı eklendi. hf_token.txt güvenli otomatik yeniden oluşturma davranışı korunuyor.'
+              --title 'PSForcer v0.2.9 BGFT Oturum Başlatma Düzeltmesi' \
+              --notes '0x80990050 SCE_BGFT_ERROR_FATAL hatası için PS4 hizmet başlatma ve SELF yetki bilgisi düzeltildi. Gerekli SysCore, SystemService, UserService, AppInstUtil, BGFT ve NpCommon modülleri yükleniyor; ardından UserService ve AppInstUtil istemcileri BGFT hizmetinden önce başlatılıyor. FSELF artık referans Remote Package Installer ile aynı BGFT yetenek bilgisini taşıyor. Büyük PKG doğrudan PS4 sistem kuyruğuna indirilip kurulmaya devam eder ve /data alanında ikinci kopya oluşturulmaz. bgft_tani.log aşama kaydı korunur.'
           fi
           gh release upload "$YAYIN_ETIKETI" \
             "$PAKET_ADI" "$PAKET_ADI.sha256" \

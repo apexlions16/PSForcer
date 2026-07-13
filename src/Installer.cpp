@@ -33,7 +33,7 @@ std::string orbisError(const char* operation, int32_t result) {
 void resetBgftDiagnostic() {
     FILE* file = std::fopen("/data/psforcer/bgft_tani.log", "wb");
     if (!file) return;
-    std::fprintf(file, "surum=0.28 asama=istek_alindi\n");
+    std::fprintf(file, "surum=0.29 asama=istek_alindi\n");
     std::fflush(file);
     std::fclose(file);
 }
@@ -86,7 +86,8 @@ InstallOutcome ManualInstaller::requestRemoteInstall(const CatalogItem& item,
 }
 
 OrbisInstaller::OrbisInstaller()
-    : bgftHeap_(NULL), bgftInitialized_(false), appInstInitialized_(false) {}
+    : bgftHeap_(NULL), bgftInitialized_(false), appInstInitialized_(false),
+      userServiceInitialized_(false), runtimeModulesLoaded_(false) {}
 
 OrbisInstaller::~OrbisInstaller() {
 #if defined(PSFORCER_ORBIS)
@@ -97,6 +98,10 @@ OrbisInstaller::~OrbisInstaller() {
     if (appInstInitialized_) {
         sceAppInstUtilTerminate();
         appInstInitialized_ = false;
+    }
+    if (userServiceInitialized_) {
+        sceUserServiceTerminate();
+        userServiceInitialized_ = false;
     }
 #endif
     std::free(bgftHeap_);
@@ -191,19 +196,60 @@ InstallOutcome OrbisInstaller::requestRemoteInstall(const CatalogItem& item,
     // Stub kitaplıklarına bağlanmak çalışma zamanında modülü otomatik yüklemez.
     // BGFT veya UserService dışa aktarımlarına modül yüklenmeden dokunmak bazı
     // PS4 ortamlarında CE-34878-0 ile sürecin kapanmasına neden olur.
-    int32_t moduleResult = loadInternalModule(
-        ORBIS_SYSMODULE_INTERNAL_USER_SERVICE, "user_service_modulu");
-    if (moduleResult < 0) {
-        return InstallOutcome(InstallResult::Failed,
-                              orbisError("UserService sistem modülünü yükleme",
-                                         moduleResult));
+    if (!runtimeModulesLoaded_) {
+        struct RequiredModule {
+            OrbisSysModuleInternal id;
+            const char* stage;
+            const char* name;
+        };
+        const RequiredModule modules[] = {
+            {ORBIS_SYSMODULE_INTERNAL_SYSCORE, "syscore_modulu", "SysCore"},
+            {ORBIS_SYSMODULE_INTERNAL_SYSTEM_SERVICE,
+             "system_service_modulu", "SystemService"},
+            {ORBIS_SYSMODULE_INTERNAL_USER_SERVICE,
+             "user_service_modulu", "UserService"},
+            {ORBIS_SYSMODULE_INTERNAL_APP_INST_UTIL,
+             "app_inst_util_modulu", "AppInstUtil"},
+            {ORBIS_SYSMODULE_INTERNAL_BGFT, "bgft_modulu", "BGFT"},
+            {ORBIS_SYSMODULE_INTERNAL_NP_COMMON, "np_common_modulu", "NpCommon"}
+        };
+        for (size_t i = 0; i < sizeof(modules) / sizeof(modules[0]); ++i) {
+            const int32_t moduleResult = loadInternalModule(
+                modules[i].id, modules[i].stage);
+            if (moduleResult < 0) {
+                return InstallOutcome(
+                    InstallResult::Failed,
+                    orbisError((std::string(modules[i].name) +
+                                " sistem modülünü yükleme").c_str(),
+                               moduleResult));
+            }
+        }
+        runtimeModulesLoaded_ = true;
     }
-    moduleResult = loadInternalModule(
-        ORBIS_SYSMODULE_INTERNAL_BGFT, "bgft_modulu");
-    if (moduleResult < 0) {
-        return InstallOutcome(InstallResult::Failed,
-                              orbisError("BGFT sistem modülünü yükleme",
-                                         moduleResult));
+
+    // BGFT istemci oturumu yalnızca modülleri yüklemekle oluşmaz. Sony'nin
+    // başlatma sırasına uygun olarak kullanıcı ve paket kurulum hizmetlerini
+    // BGFT'den önce bir kez başlat.
+    if (!userServiceInitialized_) {
+        appendBgftDiagnostic("user_service_init_basliyor");
+        const int32_t result = sceUserServiceInitialize(NULL);
+        appendBgftDiagnostic("user_service_init_tamam", result);
+        if (result != 0) {
+            return InstallOutcome(InstallResult::Failed,
+                                  orbisError("UserService başlatma", result));
+        }
+        userServiceInitialized_ = true;
+    }
+
+    if (!appInstInitialized_) {
+        appendBgftDiagnostic("app_inst_util_init_basliyor");
+        const int32_t result = sceAppInstUtilInitialize();
+        appendBgftDiagnostic("app_inst_util_init_tamam", result);
+        if (result != 0) {
+            return InstallOutcome(InstallResult::Failed,
+                                  orbisError("AppInstUtil başlatma", result));
+        }
+        appInstInitialized_ = true;
     }
 
     HttpClient resolver;
