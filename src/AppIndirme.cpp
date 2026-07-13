@@ -1,4 +1,5 @@
 #include "App.h"
+#include "BootLog.h"
 #include "FileUtil.h"
 
 #include <cstdio>
@@ -41,7 +42,9 @@ void App::startPackageDownload() {
     // Büyük PKG'yi uygulama belleği veya /data üzerinden kopyalama. Yalnızca
     // küçük PKG başlığı ve imzalı son HTTPS adresi çözülür; asıl indirme ve
     // kurulum PS4'ün yerel BGFT hizmeti tarafından yürütülür.
+    bootLog("BGFT uzaktan kurulum istegi basladi");
     const InstallOutcome remoteOutcome = installer_->requestRemoteInstall(item, package);
+    bootLog("BGFT uzaktan kurulum istegi sonuclandi");
     if (remoteOutcome.result == InstallResult::InstallStarted) {
         status_ = "PS4 indiriyor ve kuracak";
     } else {

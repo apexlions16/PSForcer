@@ -3,6 +3,7 @@
 #include "HttpClient.h"
 #include "PkgHeader.h"
 
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
@@ -13,6 +14,7 @@
 #if defined(PSFORCER_ORBIS)
 #include <orbis/AppInstUtil.h>
 #include <orbis/Bgft.h>
+#include <orbis/Sysmodule.h>
 #include <orbis/UserService.h>
 #endif
 
@@ -26,6 +28,34 @@ std::string orbisError(const char* operation, int32_t result) {
             << std::uppercase << std::hex
             << static_cast<uint32_t>(result) << ')';
     return message.str();
+}
+
+void resetBgftDiagnostic() {
+    FILE* file = std::fopen("/data/psforcer/bgft_tani.log", "wb");
+    if (!file) return;
+    std::fprintf(file, "surum=0.28 asama=istek_alindi\n");
+    std::fflush(file);
+    std::fclose(file);
+}
+
+void appendBgftDiagnostic(const char* stage, int32_t result = 0) {
+    FILE* file = std::fopen("/data/psforcer/bgft_tani.log", "ab");
+    if (!file) return;
+    std::fprintf(file, "asama=%s sonuc=0x%08X\n",
+                 stage ? stage : "bilinmiyor",
+                 static_cast<uint32_t>(result));
+    std::fflush(file);
+    std::fclose(file);
+}
+
+int32_t loadInternalModule(OrbisSysModuleInternal module, const char* stage) {
+    appendBgftDiagnostic(stage);
+    // OpenOrbis bildirimi uint32_t olsa da PS4 hata kodları işaretli 32 bittir.
+    const int32_t result = static_cast<int32_t>(
+        sceSysmoduleLoadModuleInternal(module));
+    const std::string completedStage = std::string(stage) + "_tamam";
+    appendBgftDiagnostic(completedStage.c_str(), result);
+    return result;
 }
 #endif
 }
@@ -83,6 +113,14 @@ InstallOutcome OrbisInstaller::requestInstall(const CatalogItem& item,
     return InstallOutcome(InstallResult::Failed,
                           "Otomatik PKG kurulumu yalnızca PS4 derlemesinde kullanılabilir");
 #else
+    const int32_t moduleResult = static_cast<int32_t>(
+        sceSysmoduleLoadModuleInternal(ORBIS_SYSMODULE_INTERNAL_APP_INST_UTIL));
+    if (moduleResult < 0) {
+        return InstallOutcome(InstallResult::Failed,
+                              orbisError("AppInstUtil sistem modülünü yükleme",
+                                         moduleResult));
+    }
+
     if (!fileExists(packagePath)) {
         return InstallOutcome(InstallResult::Failed,
                               "Kurulacak PKG dosyası bulunamadı");
@@ -139,7 +177,9 @@ InstallOutcome OrbisInstaller::requestRemoteInstall(const CatalogItem& item,
     return InstallOutcome(InstallResult::Failed,
                           "Doğrudan PS4 indirmesi yalnızca PS4 derlemesinde kullanılabilir");
 #else
+    resetBgftDiagnostic();
     if (package.url.empty() || package.sizeBytes == 0) {
+        appendBgftDiagnostic("paket_bilgisi_gecersiz", -1);
         return InstallOutcome(InstallResult::Failed,
                               "Uzak PKG adresi veya kesin boyutu eksik");
     }
@@ -148,19 +188,42 @@ InstallOutcome OrbisInstaller::requestRemoteInstall(const CatalogItem& item,
                               "PKG boyutu PS4 BGFT sınırını aşıyor");
     }
 
+    // Stub kitaplıklarına bağlanmak çalışma zamanında modülü otomatik yüklemez.
+    // BGFT veya UserService dışa aktarımlarına modül yüklenmeden dokunmak bazı
+    // PS4 ortamlarında CE-34878-0 ile sürecin kapanmasına neden olur.
+    int32_t moduleResult = loadInternalModule(
+        ORBIS_SYSMODULE_INTERNAL_USER_SERVICE, "user_service_modulu");
+    if (moduleResult < 0) {
+        return InstallOutcome(InstallResult::Failed,
+                              orbisError("UserService sistem modülünü yükleme",
+                                         moduleResult));
+    }
+    moduleResult = loadInternalModule(
+        ORBIS_SYSMODULE_INTERNAL_BGFT, "bgft_modulu");
+    if (moduleResult < 0) {
+        return InstallOutcome(InstallResult::Failed,
+                              orbisError("BGFT sistem modülünü yükleme",
+                                         moduleResult));
+    }
+
     HttpClient resolver;
     std::string resolvedUrl;
     std::vector<uint8_t> headerData;
     std::string error;
+    appendBgftDiagnostic("http_basliyor");
     if (!resolver.resolvePackageHeader(package.url, package.sizeBytes,
                                        resolvedUrl, headerData, error)) {
+        appendBgftDiagnostic("http_basarisiz", -1);
         return InstallOutcome(InstallResult::Failed, error);
     }
+    appendBgftDiagnostic("http_tamam");
 
     PkgHeaderInfo header;
     if (!parsePkgHeader(headerData, header, error)) {
+        appendBgftDiagnostic("pkg_basligi_gecersiz", -1);
         return InstallOutcome(InstallResult::Failed, error);
     }
+    appendBgftDiagnostic("pkg_basligi_tamam");
     if (header.packageSize != package.sizeBytes) {
         std::ostringstream message;
         message << "PKG başlığındaki boyut katalogla uyuşmuyor. Beklenen "
@@ -184,7 +247,9 @@ InstallOutcome OrbisInstaller::requestRemoteInstall(const CatalogItem& item,
         std::memset(&initParams, 0, sizeof(initParams));
         initParams.heap = bgftHeap_;
         initParams.heapSize = heapSize;
+        appendBgftDiagnostic("bgft_init_basliyor");
         const int32_t initResult = sceBgftServiceIntInit(&initParams);
+        appendBgftDiagnostic("bgft_init_tamam", initResult);
         if (initResult != 0) {
             std::free(bgftHeap_);
             bgftHeap_ = NULL;
@@ -195,7 +260,9 @@ InstallOutcome OrbisInstaller::requestRemoteInstall(const CatalogItem& item,
     }
 
     int32_t userId = -1;
+    appendBgftDiagnostic("aktif_kullanici_basliyor");
     int32_t result = sceUserServiceGetForegroundUser(&userId);
+    appendBgftDiagnostic("aktif_kullanici_tamam", result);
     if (result != 0) {
         return InstallOutcome(InstallResult::Failed,
                               orbisError("Aktif PS4 kullanıcısını alma", result));
@@ -221,15 +288,19 @@ InstallOutcome OrbisInstaller::requestRemoteInstall(const CatalogItem& item,
     params.packageSize = static_cast<uint32_t>(header.packageSize);
 
     OrbisBgftTaskId taskId = -1;
+    appendBgftDiagnostic("gorev_kaydi_basliyor");
     result = header.patch
         ? sceBgftServiceIntDebugDownloadRegisterPkg(&params, &taskId)
         : sceBgftServiceIntDownloadRegisterTask(&params, &taskId);
+    appendBgftDiagnostic("gorev_kaydi_tamam", result);
     if (result != 0) {
         return InstallOutcome(InstallResult::Failed,
                               orbisError("PS4 indirme görevini oluşturma", result));
     }
 
+    appendBgftDiagnostic("gorev_baslatiliyor");
     result = sceBgftServiceDownloadStartTask(taskId);
+    appendBgftDiagnostic("gorev_baslatma_tamam", result);
     if (result != 0) {
         sceBgftServiceIntDownloadUnregisterTask(taskId);
         return InstallOutcome(InstallResult::Failed,
@@ -239,6 +310,7 @@ InstallOutcome OrbisInstaller::requestRemoteInstall(const CatalogItem& item,
     std::ostringstream message;
     message << displayName
             << " PS4 indirme ve kurulum kuyruğuna eklendi";
+    appendBgftDiagnostic("basarili");
     return InstallOutcome(InstallResult::InstallStarted, message.str());
 #endif
 }
