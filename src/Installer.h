@@ -52,6 +52,8 @@ private:
     void* bgftHeap_;
     bool bgftInitialized_;
     bool appInstInitialized_;
+    bool userServiceInitialized_;
+    bool runtimeModulesLoaded_;
 };
 
 }  // namespace psforcer

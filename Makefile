@@ -1,8 +1,12 @@
-# PSForcer OpenOrbis paket bilgileri - v0.28
+# PSForcer OpenOrbis paket bilgileri - v0.29
 TITLE       := PSForcer
-VERSION     := 0.28
+VERSION     := 0.29
 TITLE_ID    := PSFC00001
 CONTENT_ID  := IV0000-PSFC00001_00-PSFORCERCLIENT00
+
+# BGFT istemci oturumu için Remote Package Installer ile aynı SELF yetki
+# yetenekleri. create-fself ilk 8 baytı atıp PAID değerini ayrıca yazar.
+AUTH_INFO   := 000000000000000000000000001C004000FF000000000080000000000000000000000000000000000000008000400040000000000000008000000000000000080040FFFF000000F000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 
 LIBS        := -lc -lkernel -lc++ -lSceUserService -lSceVideoOut -lSceAudioOut -lScePad -lSceSysmodule -lSDL2 -lSceNet -lSceSsl -lSceHttp -lSceAppInstUtil -lSceBgft
 EXTRAFLAGS  := -std=gnu++11 -D_GNU_SOURCE -DPSFORCER_ORBIS=1
@@ -91,7 +95,7 @@ sce_sys/param.sfo: Makefile
 
 eboot.bin: $(OBJS)
 	$(LD) $(OBJS) -o $(INTDIR)/PSForcer.elf $(LDFLAGS)
-	$(TOOLCHAIN)/bin/$(CDIR)/create-fself -in=$(INTDIR)/PSForcer.elf -out=$(INTDIR)/PSForcer.oelf --eboot "eboot.bin" --paid 0x3800000000000011
+	$(TOOLCHAIN)/bin/$(CDIR)/create-fself -in=$(INTDIR)/PSForcer.elf -out=$(INTDIR)/PSForcer.oelf --eboot "eboot.bin" --paid 0x3800000000000011 --authinfo $(AUTH_INFO)
 
 $(INTDIR)/%.o: $(PROJDIR)/%.cpp
 	@mkdir -p $(dir $@)
