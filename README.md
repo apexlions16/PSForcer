@@ -99,9 +99,15 @@ kurulur. `/data/psforcer/indirmeler` altında ikinci bir PKG kopyası oluşturul
 
 PSForcer, gerekli PS4 çalışma zamanı sistem modüllerini açıkça yükler; ardından
 UserService ve AppInstUtil istemcilerini BGFT hizmetinden önce başlatır. Uygulama
-FSELF'i, BGFT istemcisinin gerektirdiği yetenek bilgisini de taşır. Görev oluşturma
-yine tamamlanamazsa son güvenli aşama aşağıdaki dosyada tutulur; bağlantı veya
-token değeri kayda yazılmaz:
+FSELF'i, BGFT istemcisinin gerektirdiği yetenek bilgisini de taşır.
+
+PS4 sistem indiricisi yolu, GameBaTo paketinin eboot akışıyla aynı biçimde
+UserService'i `0x100` parametresiyle başlatır; paketi
+`sceBgftServiceIntDebugDownloadRegisterPkg` ile kaydeder ve
+`sceBgftServiceIntDownloadStartTask` ile başlatır.
+
+Görev oluşturma yine tamamlanamazsa son güvenli aşama aşağıdaki dosyada tutulur;
+bağlantı veya token değeri kayda yazılmaz:
 
 ```text
 /data/psforcer/bgft_tani.log
