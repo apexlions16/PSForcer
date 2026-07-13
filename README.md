@@ -104,7 +104,9 @@ FSELF'i, BGFT istemcisinin gerektirdiği yetenek bilgisini de taşır.
 PS4 sistem indiricisi yolu, GameBaTo paketinin eboot akışıyla aynı biçimde
 UserService'i `0x100` parametresiyle başlatır; paketi
 `sceBgftServiceIntDebugDownloadRegisterPkg` ile kaydeder ve
-`sceBgftServiceIntDownloadStartTask` ile başlatır.
+geniş PS4 yazılım uyumluluğu için `sceBgftServiceDownloadStartTask` ile
+başlatır. Böylece eboot, bazı sistemlerde uygulama arayüzünden önce
+CE-34878-0 üreten dahili `IntDownloadStartTask` sembolüne bağlanmaz.
 
 Görev oluşturma yine tamamlanamazsa son güvenli aşama aşağıdaki dosyada tutulur;
 bağlantı veya token değeri kayda yazılmaz:

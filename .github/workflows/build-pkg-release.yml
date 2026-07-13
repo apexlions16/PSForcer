@@ -30,7 +30,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  YAYIN_ETIKETI: v0.2.10
+  YAYIN_ETIKETI: v0.2.11
   PAKET_ADI: IV0000-PSFC00001_00-PSFORCERCLIENT00.pkg
 
 jobs:
@@ -152,8 +152,8 @@ jobs:
           if ! gh release view "$YAYIN_ETIKETI" >/dev/null 2>&1; then
             gh release create "$YAYIN_ETIKETI" \
               --target "$GITHUB_SHA" \
-              --title 'PSForcer v0.2.10 GameBaTo BGFT Yöntemi' \
-              --notes 'Gönderilen GameBaTo PKG dosyasının eboot çağrı akışı incelendi ve PS4 sistem indiricisi yöntemi PSForcer uygulamasına uyarlandı. NetCtl, Net, SSL ve HTTP modülleri BGFT oturumundan önce yükleniyor; UserService GameBaTo ile aynı 0x100 başlatma parametresini kullanıyor. Uzak ana paketler ve yamalar DebugDownloadRegisterPkg ile kaydedilip IntDownloadStartTask ile başlatılıyor. PKG doğrudan PS4 indirme ve kurulum kuyruğuna gider; /data altında ikinci kopya oluşturulmaz. SELF yetenek bilgisi ve bgft_tani.log tanısı korunur.'
+              --title 'PSForcer v0.2.11 Açılış Uyumluluğu Düzeltmesi' \
+              --notes 'v0.2.10 paketinin bazı PS4 sistemlerinde uygulama arayüzü açılmadan CE-34878-0 ile çökmesine neden olan dahili IntDownloadStartTask bağı kaldırıldı. GameBaTo tabanlı UserService, sistem modülleri ve DebugDownloadRegisterPkg kayıt akışı korunurken görev başlatma, daha geniş yazılım uyumluluğu bulunan genel DownloadStartTask API’sine geçirildi. PKG doğrudan PS4 indirme ve kurulum kuyruğuna gider; /data altında ikinci kopya oluşturulmaz. SELF yetenek bilgisi ve bgft_tani.log tanısı korunur.'
           fi
           gh release upload "$YAYIN_ETIKETI" \
             "$PAKET_ADI" "$PAKET_ADI.sha256" \
