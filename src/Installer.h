@@ -26,6 +26,8 @@ public:
     virtual InstallOutcome requestInstall(const CatalogItem& item,
                                           const PackageInfo& package,
                                           const std::string& packagePath) = 0;
+    virtual InstallOutcome requestRemoteInstall(const CatalogItem& item,
+                                                const PackageInfo& package) = 0;
 };
 
 class ManualInstaller : public Installer {
@@ -33,6 +35,8 @@ public:
     virtual InstallOutcome requestInstall(const CatalogItem& item,
                                           const PackageInfo& package,
                                           const std::string& packagePath);
+    virtual InstallOutcome requestRemoteInstall(const CatalogItem& item,
+                                                const PackageInfo& package);
 };
 
 class OrbisInstaller : public Installer {
@@ -42,7 +46,11 @@ public:
     virtual InstallOutcome requestInstall(const CatalogItem& item,
                                           const PackageInfo& package,
                                           const std::string& packagePath);
+    virtual InstallOutcome requestRemoteInstall(const CatalogItem& item,
+                                                const PackageInfo& package);
 private:
+    void* bgftHeap_;
+    bool bgftInitialized_;
     bool appInstInitialized_;
 };
 

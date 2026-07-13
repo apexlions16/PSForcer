@@ -318,7 +318,7 @@ bool HttpClient::download(const std::string& url,
         int connectionId = 0;
         int requestId = 0;
 
-        templateId = sceHttpCreateTemplate(httpContextId_, "PSForcer/0.26",
+        templateId = sceHttpCreateTemplate(httpContextId_, "PSForcer/0.27",
                                            ORBIS_HTTP_VERSION_1_1, 1);
         if (templateId < 0) {
             error = PSF_SABLON;
@@ -685,6 +685,192 @@ bool HttpClient::download(const std::string& url,
     std::fclose(output);
     std::fclose(input);
     return success;
+#endif
+}
+
+bool HttpClient::resolvePackageHeader(const std::string& url,
+                                      uint64_t expectedSize,
+                                      std::string& resolvedUrl,
+                                      std::vector<uint8_t>& header,
+                                      std::string& error) {
+    const size_t headerBytes = 0x438;
+    resolvedUrl.clear();
+    header.clear();
+    if (!initialized_ && !initialize(error)) return false;
+
+#if defined(PSFORCER_ORBIS)
+    std::string currentUrl = url;
+    const std::string token = huggingFaceToken();
+    int redirectCount = 0;
+
+    while (true) {
+        int templateId = sceHttpCreateTemplate(httpContextId_, "PSForcer/0.27",
+                                               ORBIS_HTTP_VERSION_1_1, 1);
+        if (templateId < 0) {
+            error = PSF_SABLON;
+            return false;
+        }
+
+        int connectionId = sceHttpCreateConnectionWithURL(templateId,
+                                                           currentUrl.c_str(), true);
+        if (connectionId < 0) {
+            sceHttpDeleteTemplate(templateId);
+            error = PSF_BAGLANTI;
+            return false;
+        }
+
+        int requestId = sceHttpCreateRequestWithURL(connectionId, ORBIS_METHOD_GET,
+                                                    currentUrl.c_str(), 0);
+        if (requestId < 0) {
+            closeRequestObjects(requestId, connectionId);
+            sceHttpDeleteTemplate(templateId);
+            error = PSF_ISTEK;
+            return false;
+        }
+
+        psfHttpSetAutoRedirect(requestId, 0);
+        psfHttpSetRecvBlockSize(requestId, static_cast<uint32_t>(headerBytes));
+        psfHttpSetRecvTimeOut(requestId, 60 * 1000 * 1000);
+        sceHttpSetResolveTimeOut(requestId, 20 * 1000 * 1000);
+        sceHttpSetConnectTimeOut(requestId, 30 * 1000 * 1000);
+        sceHttpSetSendTimeOut(requestId, 30 * 1000 * 1000);
+        sceHttpAddRequestHeader(requestId, "Accept", "application/octet-stream", 0);
+        sceHttpAddRequestHeader(requestId, "Accept-Encoding", "identity", 0);
+        sceHttpAddRequestHeader(requestId, "Connection", "close", 0);
+        std::ostringstream range;
+        range << "bytes=0-" << (headerBytes - 1);
+        sceHttpAddRequestHeader(requestId, "Range", range.str().c_str(), 0);
+
+        if (isHuggingFaceUrl(currentUrl) && !token.empty()) {
+            const std::string authorization = "Bearer " + token;
+            sceHttpAddRequestHeader(requestId, "Authorization",
+                                    authorization.c_str(), 0);
+        }
+
+        if (sceHttpSendRequest(requestId, NULL, 0) < 0) {
+            closeRequestObjects(requestId, connectionId);
+            sceHttpDeleteTemplate(templateId);
+            error = PSF_GONDER;
+            return false;
+        }
+
+        int32_t statusCode = 0;
+        if (sceHttpGetStatusCode(requestId, &statusCode) < 0) {
+            closeRequestObjects(requestId, connectionId);
+            sceHttpDeleteTemplate(templateId);
+            error = PSF_DURUM;
+            return false;
+        }
+
+        if (isRedirectStatus(statusCode)) {
+            if (++redirectCount > 8) {
+                closeRequestObjects(requestId, connectionId);
+                sceHttpDeleteTemplate(templateId);
+                error = "PKG adresi yönlendirme sınırını aştı";
+                return false;
+            }
+            const std::string location = responseHeaderValue(requestId, "Location");
+            if (location.empty()) {
+                closeRequestObjects(requestId, connectionId);
+                sceHttpDeleteTemplate(templateId);
+                error = "PKG yönlendirmesinde hedef adres bulunamadı";
+                return false;
+            }
+            currentUrl = absoluteRedirectUrl(currentUrl, location);
+            closeRequestObjects(requestId, connectionId);
+            sceHttpDeleteTemplate(templateId);
+            continue;
+        }
+
+        if (statusCode == 401 && isHuggingFaceUrl(currentUrl)) {
+            closeRequestObjects(requestId, connectionId);
+            sceHttpDeleteTemplate(templateId);
+            error = "Hugging Face erişimi reddedildi. Salt-okunur tokenı "
+                    "/data/psforcer/hf_token.txt dosyasının ilk satırına yazın";
+            return false;
+        }
+        if (statusCode != 200 && statusCode != 206) {
+            closeRequestObjects(requestId, connectionId);
+            sceHttpDeleteTemplate(templateId);
+            std::ostringstream message;
+            message << "PKG başlığı alınamadı; HTTP " << statusCode;
+            error = message.str();
+            return false;
+        }
+
+        uint64_t reportedSize = 0;
+        const ContentRangeInfo contentRange =
+            parseContentRange(responseHeaderValue(requestId, "Content-Range"));
+        if (contentRange.valid && contentRange.total > 0) {
+            reportedSize = contentRange.total;
+        } else {
+            int contentLengthType = 0;
+            uint64_t responseLength = 0;
+            if (statusCode == 200 &&
+                sceHttpGetResponseContentLength(requestId, &contentLengthType,
+                                                 &responseLength) >= 0 &&
+                contentLengthType == ORBIS_HTTP_CONTENTLEN_EXIST) {
+                reportedSize = responseLength;
+            }
+        }
+        if (expectedSize > 0 && reportedSize > 0 && reportedSize != expectedSize) {
+            closeRequestObjects(requestId, connectionId);
+            sceHttpDeleteTemplate(templateId);
+            std::ostringstream message;
+            message << "Uzak PKG boyutu katalogla uyuşmuyor. Beklenen "
+                    << expectedSize << " bayt, bildirilen " << reportedSize;
+            error = message.str();
+            return false;
+        }
+
+        header.assign(headerBytes, 0);
+        size_t received = 0;
+        while (received < headerBytes) {
+            const int read = sceHttpReadData(
+                requestId, &header[received],
+                static_cast<uint32_t>(headerBytes - received));
+            if (read <= 0) {
+                closeRequestObjects(requestId, connectionId);
+                sceHttpDeleteTemplate(templateId);
+                header.clear();
+                error = read < 0 ? PSF_AG_OKUMA : "PKG başlığı erken sona erdi";
+                return false;
+            }
+            received += static_cast<size_t>(read);
+        }
+
+        resolvedUrl = currentUrl;
+        closeRequestObjects(requestId, connectionId);
+        sceHttpDeleteTemplate(templateId);
+        error.clear();
+        return true;
+    }
+#else
+    if (url.compare(0, 7, "file://") != 0) {
+        error = PSF_YEREL;
+        return false;
+    }
+    const std::string path = url.substr(7);
+    if (expectedSize > 0 && fileSize(path) != expectedSize) {
+        error = "Yerel PKG boyutu katalogla uyuşmuyor";
+        return false;
+    }
+    FILE* input = std::fopen(path.c_str(), "rb");
+    if (!input) {
+        error = PSF_KAYNAK;
+        return false;
+    }
+    header.assign(headerBytes, 0);
+    const size_t received = std::fread(&header[0], 1, headerBytes, input);
+    std::fclose(input);
+    if (received != headerBytes) {
+        header.clear();
+        error = "PKG başlığı erken sona erdi";
+        return false;
+    }
+    resolvedUrl = url;
+    error.clear();
+    return true;
 #endif
 }
 

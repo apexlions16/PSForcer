@@ -9,6 +9,7 @@ add_library(psforcer_cekirdegi
     src/Catalog.cpp
     src/Sha256.cpp
     src/FileUtil.cpp
+    src/PkgHeader.cpp
     src/HttpClientTurkce.cpp
     src/DownloadManager.cpp
     src/MediaCache.cpp
@@ -26,3 +27,7 @@ add_test(NAME katalog_cozumleme_sinavi
 add_executable(indirme_yoneticisi_sinavi tests/download_manager_test.cpp)
 target_link_libraries(indirme_yoneticisi_sinavi PRIVATE psforcer_cekirdegi)
 add_test(NAME indirme_yoneticisi_sinavi COMMAND indirme_yoneticisi_sinavi)
+
+add_executable(pkg_basligi_sinavi tests/pkg_header_test.cpp)
+target_link_libraries(pkg_basligi_sinavi PRIVATE psforcer_cekirdegi)
+add_test(NAME pkg_basligi_sinavi COMMAND pkg_basligi_sinavi)
