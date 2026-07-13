@@ -1,7 +1,6 @@
 #include "Installer.h"
 #include "FileUtil.h"
 
-#include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iomanip>
@@ -9,7 +8,6 @@
 
 #if defined(PSFORCER_ORBIS)
 #include <orbis/AppInstUtil.h>
-#include <orbis/Bgft.h>
 #endif
 
 namespace psforcer {
@@ -44,21 +42,15 @@ InstallOutcome ManualInstaller::requestInstall(const CatalogItem& item,
 }
 
 OrbisInstaller::OrbisInstaller()
-    : bgftHeap_(NULL), bgftInitialized_(false), appInstInitialized_(false) {}
+    : appInstInitialized_(false) {}
 
 OrbisInstaller::~OrbisInstaller() {
 #if defined(PSFORCER_ORBIS)
-    if (bgftInitialized_) {
-        sceBgftServiceIntTerm();
-        bgftInitialized_ = false;
-    }
     if (appInstInitialized_) {
         sceAppInstUtilTerminate();
         appInstInitialized_ = false;
     }
 #endif
-    std::free(bgftHeap_);
-    bgftHeap_ = NULL;
 }
 
 InstallOutcome OrbisInstaller::requestInstall(const CatalogItem& item,
@@ -76,6 +68,14 @@ InstallOutcome OrbisInstaller::requestInstall(const CatalogItem& item,
                               "Kurulacak PKG dosyası bulunamadı");
     }
 
+    const uint64_t actualSize = fileSize(packagePath);
+    if (package.sizeBytes > 0 && actualSize != package.sizeBytes) {
+        std::ostringstream message;
+        message << "Kurulum durduruldu: PKG boyutu beklenen "
+                << package.sizeBytes << " bayt yerine " << actualSize << " bayt";
+        return InstallOutcome(InstallResult::Failed, message.str());
+    }
+
     if (!appInstInitialized_) {
         const int32_t result = sceAppInstUtilInitialize();
         if (result != 0) {
@@ -83,29 +83,6 @@ InstallOutcome OrbisInstaller::requestInstall(const CatalogItem& item,
                                   orbisError("AppInstUtil başlatma", result));
         }
         appInstInitialized_ = true;
-    }
-
-    if (!bgftInitialized_) {
-        const size_t heapSize = 1024 * 1024;
-        bgftHeap_ = std::malloc(heapSize);
-        if (!bgftHeap_) {
-            return InstallOutcome(InstallResult::Failed,
-                                  "BGFT kurulumu için bellek ayrılamadı");
-        }
-        std::memset(bgftHeap_, 0, heapSize);
-
-        OrbisBgftInitParams params;
-        std::memset(&params, 0, sizeof(params));
-        params.heap = bgftHeap_;
-        params.heapSize = heapSize;
-        const int32_t result = sceBgftServiceIntInit(&params);
-        if (result != 0) {
-            std::free(bgftHeap_);
-            bgftHeap_ = NULL;
-            return InstallOutcome(InstallResult::Failed,
-                                  orbisError("BGFT başlatma", result));
-        }
-        bgftInitialized_ = true;
     }
 
     char titleId[16];
@@ -118,35 +95,18 @@ InstallOutcome OrbisInstaller::requestInstall(const CatalogItem& item,
                               orbisError("PKG kimliği okuma", result));
     }
 
-    const std::string contentName = item.title + " - " + package.label;
-    OrbisBgftDownloadParamEx params;
-    std::memset(&params, 0, sizeof(params));
-    params.params.entitlementType = 5;
-    params.params.id = "";
-    params.params.contentUrl = packagePath.c_str();
-    params.params.contentName = contentName.c_str();
-    params.params.iconPath = "/app0/sce_sys/icon0.png";
-    params.params.option = ORBIS_BGFT_TASK_OPT_INVISIBLE;
-    params.params.playgoScenarioId = "0";
-    params.slot = 0;
-
-    OrbisBgftTaskId taskId = -1;
-    result = sceBgftServiceIntDownloadRegisterTaskByStorageEx(&params, &taskId);
+    // Dosya artık ağ kaynağı değildir: doğrulanmış ve kapatılmış yerel PKG'yi
+    // doğrudan AppInstUtil'a ver. BGFT download görevi kullanmak aynı dosyayı
+    // yeniden bir indirme hedefi gibi işleyip boyutunun büyümesine yol açabiliyordu.
+    result = sceAppInstUtilAppInstallPkg(packagePath.c_str(), NULL);
     if (result != 0) {
         return InstallOutcome(InstallResult::Failed,
-                              orbisError("PKG kurulum görevi oluşturma", result));
-    }
-
-    result = sceBgftServiceDownloadStartTask(taskId);
-    if (result != 0) {
-        sceBgftServiceIntDownloadUnregisterTask(taskId);
-        return InstallOutcome(InstallResult::Failed,
-                              orbisError("PKG kurulumunu başlatma", result));
+                              orbisError("Yerel PKG kurulumunu başlatma", result));
     }
 
     std::ostringstream message;
-    message << "İndirme tamamlandı; " << titleId
-            << " kurulumu PS4 arka plan hizmetine teslim edildi";
+    message << item.title << " tam boyutta indirildi; " << titleId
+            << " yerel PKG kurulumu başlatıldı";
     return InstallOutcome(InstallResult::InstallStarted, message.str());
 #endif
 }

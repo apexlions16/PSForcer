@@ -10,7 +10,6 @@ on:
       - 'tests/**'
       - 'CMakeLists.txt'
       - 'tools/generate_assets.py'
-      - 'tools/apply_v023.py'
       - 'sce_sys/**'
   push:
     branches: [main]
@@ -21,7 +20,6 @@ on:
       - 'tests/**'
       - 'CMakeLists.txt'
       - 'tools/generate_assets.py'
-      - 'tools/apply_v023.py'
       - 'sce_sys/**'
 
 permissions:
@@ -32,8 +30,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  YAYIN_ETIKETI: v0.2.5
-  ESKI_YAYIN_ETIKETI: v0.2.4
+  YAYIN_ETIKETI: v0.2.6
+  ESKI_YAYIN_ETIKETI: v0.2.5
   PAKET_ADI: IV0000-PSFC00001_00-PSFORCERCLIENT00.pkg
 
 jobs:
@@ -165,8 +163,8 @@ jobs:
           if ! gh release view "$YAYIN_ETIKETI" >/dev/null 2>&1; then
             gh release create "$YAYIN_ETIKETI" \
               --target "$GITHUB_SHA" \
-              --title 'PSForcer v0.2.5 Temiz İndirme ve Otomatik Kurulum' \
-              --notes 'Her paket indirmesi eski .parca dosyasını silerek sıfırdan başlar ve katalogda kesin boyut bulunmadığında güvenli biçimde reddedilir. HTTP Range isteği hedef PKG son baytıyla sınırlandırılır, sunucunun bildirdiği boyut katalogla karşılaştırılır ve bağlantı her yanıt sonunda kapatılır. Doğrulanan PKG artık PS4 BGFT hizmetine otomatik kurulum görevi olarak teslim edilir. Hugging Face 401 hataları token dosyasının tam yolunu gösterir.'
+              --title 'PSForcer v0.2.6 Tam PKG ve Yerel Kurulum Düzeltmesi' \
+              --notes 'PKG önce katalogdaki kesin bayt boyutuna kadar ayrı .parca dosyasına indirilir, kapatılır ve doğrulandıktan sonra .pkg adına çevrilir. Tamamlanan yerel dosya artık BGFT indirme görevi olarak yeniden işlenmez; doğrudan AppInstUtil yerel PKG kurucusuna teslim edilir. HTTP son-bayt ve sunucu boyut korumaları gerçek C++ kaynağına taşındı, derleme zamanı kaynak yaması kaldırıldı. Silinen /data/psforcer/hf_token.txt güvenli şablonla otomatik geri oluşturulur; gerçek token yayına eklenmez.'
           fi
           gh release upload "$YAYIN_ETIKETI" \
             "$PAKET_ADI" "$PAKET_ADI.sha256" \

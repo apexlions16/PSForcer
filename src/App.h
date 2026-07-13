@@ -34,6 +34,7 @@ private:
     void processDownloadCompletion();
     void processCatalogCompletion();
     void setToast(const std::string& message, uint32_t durationMs = 4500);
+    bool ensureHuggingFaceTokenFile() const;
     std::string runtimeRoot() const;
     std::string bundledPath(const std::string& relative) const;
     SDL_Window* window_;

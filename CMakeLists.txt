@@ -4,22 +4,6 @@ project(PSForcerCekirdegi LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_program(PSFORCER_PYTHON NAMES python3 python)
-if(NOT PSFORCER_PYTHON)
-    message(FATAL_ERROR "v0.2.3 kaynak yaması için Python bulunamadı")
-endif()
-
-execute_process(
-    COMMAND ${PSFORCER_PYTHON} ${CMAKE_SOURCE_DIR}/tools/apply_v023.py
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    RESULT_VARIABLE PSFORCER_PATCH_RESULT
-    OUTPUT_VARIABLE PSFORCER_PATCH_OUTPUT
-    ERROR_VARIABLE PSFORCER_PATCH_ERROR
-)
-if(NOT PSFORCER_PATCH_RESULT EQUAL 0)
-    message(FATAL_ERROR "v0.2.3 kaynak yaması uygulanamadı: ${PSFORCER_PATCH_ERROR}")
-endif()
-
 add_library(psforcer_cekirdegi
     src/JsonTurkce.cpp
     src/Catalog.cpp
