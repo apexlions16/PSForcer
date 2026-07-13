@@ -101,12 +101,11 @@ PSForcer, gerekli PS4 çalışma zamanı sistem modüllerini açıkça yükler; 
 UserService ve AppInstUtil istemcilerini BGFT hizmetinden önce başlatır. Uygulama
 FSELF'i, BGFT istemcisinin gerektirdiği yetenek bilgisini de taşır.
 
-PS4 sistem indiricisi yolu, GameBaTo paketinin eboot akışıyla aynı biçimde
-UserService'i `0x100` parametresiyle başlatır; paketi
-`sceBgftServiceIntDebugDownloadRegisterPkg` ile kaydeder ve
-geniş PS4 yazılım uyumluluğu için `sceBgftServiceDownloadStartTask` ile
-başlatır. Böylece eboot, bazı sistemlerde uygulama arayüzünden önce
-CE-34878-0 üreten dahili `IntDownloadStartTask` sembolüne bağlanmaz.
+v0.2.12 kurtarma paketi, PS4'te açıldığı doğrulanan v0.2.9 eboot'unu
+byte-byte yeniden üretir. Ana paketler `sceBgftServiceIntDownloadRegisterTask`,
+yamalar `sceBgftServiceIntDebugDownloadRegisterPkg` ile kaydedilir ve görev
+`sceBgftServiceDownloadStartTask` ile başlatılır. GitHub Actions, yayın öncesi
+eboot SHA-256 değerini bilinen çalışan dosyayla karşılaştırır.
 
 Görev oluşturma yine tamamlanamazsa son güvenli aşama aşağıdaki dosyada tutulur;
 bağlantı veya token değeri kayda yazılmaz:
