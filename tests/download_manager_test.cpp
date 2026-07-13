@@ -103,6 +103,29 @@ int main() {
                   << snapshot.error << '\n';
         return 1;
     }
+    manager.reset();
+
+    // Yeni kullanıcı indirmesi eski ve hedef boyutundan büyük bir .parca
+    // dosyasını devam ettirmemeli; wb ile sıfırdan kurup tam hedefte bitmelidir.
+    {
+        std::ofstream output(destination.c_str(), std::ios::binary | std::ios::trunc);
+        output.write(payload.data(), static_cast<std::streamsize>(payload.size()));
+        output.write("ESKI-VERI", 9);
+    }
+    request.jobId = 4;
+    request.expectedSize = payload.size();
+    request.resume = false;
+    if (!manager.start(request, error)) {
+        std::cerr << error << '\n';
+        return 1;
+    }
+    snapshot = waitFor(manager);
+    if (snapshot.state != psforcer::DownloadState::Completed ||
+        psforcer::fileSize(destination) != payload.size()) {
+        std::cerr << "Eski parça temizlenerek indirme tamamlanamadı: "
+                  << snapshot.error << '\n';
+        return 1;
+    }
 
     manager.stopAndWait();
     std::remove(source.c_str());

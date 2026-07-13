@@ -25,19 +25,34 @@ void App::startPackageDownload() {
         setToast("Bu paket için indirme bağlantısı eklenmedi");
         return;
     }
+    if (package.sizeBytes == 0) {
+        setToast("Katalogdaki kesin paket boyutu eksik; güvenli indirme başlatılmadı", 7000);
+        return;
+    }
 
     const std::string baseName = sanitizeFileName(item.id + "-" + package.id + "-" + package.version + ".pkg");
     pendingFinalPath_ = runtimeRoot() + "/indirmeler/" + baseName;
+    const std::string partialPath = pendingFinalPath_ + ".parca";
+
+    // Paket indirmeleri hiçbir zaman eski bir .parca dosyasına eklenmez. Önceki
+    // başarısız denemeden kalan veri hedef boyutu aşabilir veya başka bir HTTP
+    // yanıtına ait olabilir; her kullanıcı başlatmasında dosya sıfırdan kurulur.
+    std::remove(partialPath.c_str());
+    std::remove((pendingFinalPath_ + ".hazir").c_str());
+    if (fileExists(partialPath)) {
+        setToast("Eski .parca dosyası silinemedi; FTP bağlantısını kapatıp tekrar deneyin", 7500);
+        return;
+    }
 
     DownloadRequest request;
     request.jobId = nextJobId_++;
     request.id = package.id;
     request.label = item.title + " - " + package.label;
     request.url = package.url;
-    request.destination = pendingFinalPath_ + ".parca";
+    request.destination = partialPath;
     request.sha256 = package.sha256;
     request.expectedSize = package.sizeBytes;
-    request.resume = true;
+    request.resume = false;
 
     std::string error;
     if (!downloads_.start(request, error)) {
@@ -48,7 +63,7 @@ void App::startPackageDownload() {
 
     pendingItemIndex_ = itemIndex;
     pendingPackageIndex_ = selectedPackage_;
-    status_ = "İndirme başlatıldı";
+    status_ = "Temiz indirme başlatıldı";
 }
 
 void App::refreshCatalog(bool silent) {
@@ -151,6 +166,8 @@ void App::processDownloadCompletion() {
     if (outcome.result == InstallResult::Installed && package.deleteAfterInstall) {
         std::remove(pendingFinalPath_.c_str());
         status_ = "Kuruldu ve paket silindi";
+    } else if (outcome.result == InstallResult::InstallStarted) {
+        status_ = "PS4 kurulumu başlatıldı";
     } else if (outcome.result == InstallResult::ReadyForManualInstall) {
         status_ = "Paket kurulum için hazır";
     } else {
