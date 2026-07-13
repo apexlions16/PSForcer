@@ -10,11 +10,19 @@ namespace {
 const int kEkranGenisligi = 1920;
 const int kEkranYuksekligi = 1080;
 const int kSutunSayisi = 4;
+
+Installer* createInstaller() {
+#if defined(PSFORCER_ORBIS)
+    return new OrbisInstaller();
+#else
+    return new ManualInstaller();
+#endif
+}
 }
 
 App::App()
     : window_(NULL), renderer_(NULL), controller_(NULL), screen_(Screen::Browse), filter_(0),
-      selectedVisible_(0), selectedPackage_(0), toastUntil_(0), installer_(new ManualInstaller()),
+      selectedVisible_(0), selectedPackage_(0), toastUntil_(0), installer_(createInstaller()),
       nextJobId_(1), lastHandledJobId_(0), lastHandledCatalogJobId_(0),
       pendingItemIndex_(0), pendingPackageIndex_(0), catalogRefreshSilent_(false) {}
 
