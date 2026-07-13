@@ -318,7 +318,7 @@ bool HttpClient::download(const std::string& url,
         int connectionId = 0;
         int requestId = 0;
 
-        templateId = sceHttpCreateTemplate(httpContextId_, "PSForcer/0.22",
+        templateId = sceHttpCreateTemplate(httpContextId_, "PSForcer/0.26",
                                            ORBIS_HTTP_VERSION_1_1, 1);
         if (templateId < 0) {
             error = PSF_SABLON;
@@ -349,7 +349,9 @@ bool HttpClient::download(const std::string& url,
             sceHttpSetSendTimeOut(requestId, 30 * 1000 * 1000);
             sceHttpAddRequestHeader(requestId, "Accept", "application/octet-stream", 0);
             sceHttpAddRequestHeader(requestId, "Accept-Encoding", "identity", 0);
-            sceHttpAddRequestHeader(requestId, "Connection", "keep-alive", 0);
+            // Her HTTP yanıtını açıkça kapat. Bağlantı erken biterse bir sonraki
+            // istek kalıcı dosya ofsetinden doğrulanmış bir Range ile açılır.
+            sceHttpAddRequestHeader(requestId, "Connection", "close", 0);
 
             bool tokenAdded = false;
             if (allowToken && isHuggingFaceUrl(currentUrl)) {
@@ -365,6 +367,7 @@ bool HttpClient::download(const std::string& url,
             if (rangeRequested) {
                 std::ostringstream range;
                 range << "bytes=" << requestStart << '-';
+                if (expectedSize > 0) range << (expectedSize - 1);
                 if (sceHttpAddRequestHeader(requestId, "Range",
                                             range.str().c_str(), 0) < 0) {
                     error = "Kaldığı yerden devam başlığı eklenemedi";
@@ -426,7 +429,12 @@ bool HttpClient::download(const std::string& url,
         }
         if (statusCode != 200 && statusCode != 206) {
             std::ostringstream message;
-            message << "İndirme isteği başarısız oldu; durum kodu: " << statusCode;
+            if (statusCode == 401 && isHuggingFaceUrl(currentUrl)) {
+                message << "Hugging Face erişimi reddedildi. Tokenı "
+                        << "/data/psforcer/hf_token.txt dosyasının ilk satırına yazın";
+            } else {
+                message << "İndirme isteği başarısız oldu; durum kodu: " << statusCode;
+            }
             error = message.str();
             closeRequestObjects(requestId, connectionId);
             sceHttpDeleteTemplate(templateId);
@@ -458,9 +466,44 @@ bool HttpClient::download(const std::string& url,
         }
         if (expectedSize > 0) total = expectedSize;
 
+        // Yanlış nesne veya hata gövdesi diske yazılmadan önce sunucunun
+        // bildirdiği tam nesne boyutunu katalogdaki PKG boyutuyla eşleştir.
+        if (expectedSize > 0) {
+            bool sizeMismatch = false;
+            uint64_t reportedSize = 0;
+            if (contentRange.valid && contentRange.total > 0) {
+                reportedSize = contentRange.total;
+                sizeMismatch = reportedSize != expectedSize;
+            } else if (!rangeRequested && expectedResponseBytes > 0) {
+                reportedSize = expectedResponseBytes;
+                sizeMismatch = reportedSize != expectedSize;
+            }
+            if (sizeMismatch) {
+                std::ostringstream message;
+                message << "Sunucu dosya boyutu katalogla uyuşmuyor. Beklenen "
+                        << expectedSize << " bayt, bildirilen " << reportedSize;
+                error = message.str();
+                closeRequestObjects(requestId, connectionId);
+                sceHttpDeleteTemplate(templateId);
+                break;
+            }
+        }
+
         std::vector<uint8_t> buffer(512 * 1024);
         bool readFailed = false;
         while (true) {
+            // Tam boyuta ulaşıldığında keep-alive EOF'sini bekleme. Ayrıca
+            // sceHttpReadData'ya yalnızca dosyada/yanıtta kalan bayt sayısını
+            // ver; böylece son küçük parça için 512 KiB tamponun dolması beklenmez.
+            if (expectedSize > 0 && downloaded == expectedSize) {
+                success = true;
+                break;
+            }
+            if (expectedResponseBytes > 0 &&
+                responseBytes == expectedResponseBytes) {
+                break;
+            }
+
             if (cancel && cancel->load()) {
                 error = PSF_IPTAL;
                 sceHttpAbortRequest(requestId);
@@ -468,8 +511,19 @@ bool HttpClient::download(const std::string& url,
                 break;
             }
 
-            const int read = sceHttpReadData(requestId, &buffer[0],
-                                             static_cast<uint32_t>(buffer.size()));
+            uint64_t readCapacity = buffer.size();
+            if (expectedSize > 0) {
+                readCapacity = std::min<uint64_t>(
+                    readCapacity, expectedSize - downloaded);
+            }
+            if (expectedResponseBytes > 0) {
+                readCapacity = std::min<uint64_t>(
+                    readCapacity, expectedResponseBytes - responseBytes);
+            }
+            if (readCapacity == 0) break;
+
+            const int read = sceHttpReadData(
+                requestId, &buffer[0], static_cast<uint32_t>(readCapacity));
             if (read < 0) {
                 int32_t lastErrno = 0;
                 sceHttpGetLastErrno(requestId, &lastErrno);
@@ -568,7 +622,6 @@ bool HttpClient::download(const std::string& url,
                              downloaded, persisted, success, error);
     return success;
 #else
-    (void)expectedSize;
     if (url.compare(0, 7, "file://") != 0) {
         error = PSF_YEREL;
         return false;
@@ -582,7 +635,8 @@ bool HttpClient::download(const std::string& url,
     }
 
     uint64_t existing = resume ? fileSize(destination) : 0;
-    const uint64_t total = fileSize(sourcePath);
+    const uint64_t sourceSize = fileSize(sourcePath);
+    const uint64_t total = expectedSize > 0 ? expectedSize : sourceSize;
     if (existing > total) existing = 0;
 
     if (existing > 0) {
@@ -607,7 +661,14 @@ bool HttpClient::download(const std::string& url,
             break;
         }
 
-        const size_t read = std::fread(&buffer[0], 1, buffer.size(), input);
+        if (expectedSize > 0 && copied >= expectedSize) break;
+
+        size_t wanted = buffer.size();
+        if (expectedSize > 0) {
+            wanted = static_cast<size_t>(std::min<uint64_t>(
+                wanted, expectedSize - copied));
+        }
+        const size_t read = std::fread(&buffer[0], 1, wanted, input);
         if (read > 0 && std::fwrite(&buffer[0], 1, read, output) != read) {
             error = PSF_YAZMA;
             success = false;
@@ -616,7 +677,8 @@ bool HttpClient::download(const std::string& url,
 
         copied += read;
         if (progress) progress(HttpProgress{copied, total});
-        if (read < buffer.size()) break;
+        if (expectedSize > 0 && copied == expectedSize) break;
+        if (read < wanted) break;
     }
 
     std::fflush(output);

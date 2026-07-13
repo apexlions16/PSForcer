@@ -43,8 +43,6 @@ public:
                                           const PackageInfo& package,
                                           const std::string& packagePath);
 private:
-    void* bgftHeap_;
-    bool bgftInitialized_;
     bool appInstInitialized_;
 };
 

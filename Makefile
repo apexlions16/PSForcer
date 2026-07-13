@@ -1,16 +1,15 @@
-# PSForcer OpenOrbis paket bilgileri - v0.25
+# PSForcer OpenOrbis paket bilgileri - v0.26
 TITLE       := PSForcer
-VERSION     := 0.25
+VERSION     := 0.26
 TITLE_ID    := PSFC00001
 CONTENT_ID  := IV0000-PSFC00001_00-PSFORCERCLIENT00
 
-LIBS        := -lc -lkernel -lc++ -lSceUserService -lSceVideoOut -lSceAudioOut -lScePad -lSceSysmodule -lSDL2 -lSceNet -lSceSsl -lSceHttp -lSceBgft -lSceAppInstUtil
+LIBS        := -lc -lkernel -lc++ -lSceUserService -lSceVideoOut -lSceAudioOut -lScePad -lSceSysmodule -lSDL2 -lSceNet -lSceSsl -lSceHttp -lSceAppInstUtil
 EXTRAFLAGS  := -std=gnu++11 -D_GNU_SOURCE -DPSFORCER_ORBIS=1
 
 TOOLCHAIN   := $(OO_PS4_TOOLCHAIN)
 PROJDIR     := src
 INTDIR      := x64/Debug
-PATCH_STAMP := .v025-source-ready
 ROOT_ASSETS := assets/catalog.json assets/hf_token.txt assets/katalog_adresi.txt
 PACKAGE_MEDIA := assets/pt-cover.jpg assets/pt-header.jpg assets/pt-screenshot-1.jpg assets/pt-screenshot-2.jpg assets/pt-screenshot-3.jpg
 ASSETS      := $(ROOT_ASSETS) $(PACKAGE_MEDIA)
@@ -49,12 +48,6 @@ bootstrap: check-env-only
 
 check-env-only:
 	@test -n "$(OO_PS4_TOOLCHAIN)" || (echo "OO_PS4_TOOLCHAIN ayarlanmadı" && exit 1)
-
-$(PATCH_STAMP): tools/apply_v023.py src/HttpClientTurkce.cpp
-	python3 tools/apply_v023.py
-	@touch $@
-
-$(OBJS): | $(PATCH_STAMP)
 
 $(CONTENT_ID).pkg: pkg.gp4
 	$(TOOLCHAIN)/bin/$(CDIR)/PkgTool.Core pkg_build $< .
@@ -105,4 +98,4 @@ $(INTDIR)/%.o: $(PROJDIR)/%.cpp
 	$(CCX) $(CXXFLAGS) -o $@ $<
 
 clean:
-	rm -rf x64 eboot.bin pkg.gp4 sce_sys/param.sfo $(CONTENT_ID).pkg $(PACKAGE_MEDIA) $(PATCH_STAMP)
+	rm -rf x64 eboot.bin pkg.gp4 sce_sys/param.sfo $(CONTENT_ID).pkg $(PACKAGE_MEDIA) .v023-source-ready .v025-source-ready

@@ -30,6 +30,13 @@ void App::startPackageDownload() {
         return;
     }
 
+    // Kullanıcı dosyayı FTP ile silmiş olsa bile indirmeden önce güvenli şablonu
+    // geri getir. Gerçek token hiçbir zaman paket veya GitHub içine yazılmaz.
+    if (!ensureHuggingFaceTokenFile()) {
+        setToast("/data/psforcer/hf_token.txt yeniden oluşturulamadı", 7000);
+        return;
+    }
+
     const std::string baseName = sanitizeFileName(item.id + "-" + package.id + "-" + package.version + ".pkg");
     pendingFinalPath_ = runtimeRoot() + "/indirmeler/" + baseName;
     const std::string partialPath = pendingFinalPath_ + ".parca";
@@ -167,7 +174,7 @@ void App::processDownloadCompletion() {
         std::remove(pendingFinalPath_.c_str());
         status_ = "Kuruldu ve paket silindi";
     } else if (outcome.result == InstallResult::InstallStarted) {
-        status_ = "PS4 kurulumu başlatıldı";
+        status_ = "Tam PKG yerel kurucuya teslim edildi";
     } else if (outcome.result == InstallResult::ReadyForManualInstall) {
         status_ = "Paket kurulum için hazır";
     } else {

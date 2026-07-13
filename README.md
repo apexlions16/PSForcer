@@ -14,6 +14,7 @@ PSForcer, OpenOrbis tabanlı bir PlayStation 4 katalog ve indirme istemcisidir. 
 - Paket içinden yüklenen ve GitHub üzerinden açılışta otomatik yenilenen JSON kataloğu
 - Sürdürülebilir arka plan HTTP(S) indirmeleri
 - Kurucuya teslimden önce SHA-256 bütünlük denetimi
+- PKG tam boyutta kapatıldıktan sonra doğrudan yerel AppInstUtil kurulumuna teslim
 - Yalnızca kurucu başarı bildirdikten sonra çalışan kurulum sonrası silme seçeneği
 - Hugging Face herkese açık ve yetkili salt-okunur erişim desteği
 
@@ -72,6 +73,10 @@ Herkese açık Hugging Face dosyaları ek ayar gerektirmez. Bir paket bağlantı
 
 Belirteç GitHub kataloğuna, uygulama paketine, ekran görüntülerine veya hata kayıtlarına eklenmemelidir. PSForcer bu değeri yalnızca `https://huggingface.co/` isteklerinde `Authorization: Bearer` başlığı olarak kullanır. Erişim izni olmayan bir depo bu yöntemle aşılamaz; depo sahibi dosyayı herkese açık yapmalı veya kullanıcıya meşru okuma izni vermelidir.
 
+Bu dosya FTP ile silinirse PSForcer bir sonraki açılışta veya paket indirmesi
+başlatılırken güvenli açıklama şablonunu yeniden oluşturur. Gerçek token yalnızca
+PS4 üzerindeki `/data/psforcer/hf_token.txt` dosyasına kullanıcı tarafından yazılır.
+
 ## Bilgisayarda doğrulama
 
 Katalog çözümleyicisi ve SHA-256 uygulaması platformdan bağımsızdır:
@@ -82,6 +87,14 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 python3 tools/validate_catalog.py assets/catalog.json
 ```
+
+## İndirme ve kurulum sırası
+
+Paket önce `/data/psforcer/indirmeler/*.pkg.parca` dosyasına yazılır. Katalogdaki
+kesin bayt boyutu (ve varsa SHA-256) doğrulanmadan dosya tamamlanmış sayılmaz.
+Doğrulama başarılı olduğunda dosya kapatılır, `.pkg` adına çevrilir ve ancak
+bundan sonra PS4'ün yerel PKG kurucusuna teslim edilir. Kurulum aşaması aynı
+dosya üzerinde ikinci bir ağ indirmesi başlatmaz.
 
 ## Proje durumu
 

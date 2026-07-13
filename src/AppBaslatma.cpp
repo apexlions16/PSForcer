@@ -44,6 +44,25 @@ std::string App::bundledPath(const std::string& relative) const {
 #endif
 }
 
+bool App::ensureHuggingFaceTokenFile() const {
+    const std::string tokenPath = runtimeRoot() + "/hf_token.txt";
+    if (fileExists(tokenPath)) return true;
+
+    FILE* tokenFile = std::fopen(tokenPath.c_str(), "wb");
+    if (!tokenFile) return false;
+
+    std::string templateLine = readFirstLine(bundledPath("assets/hf_token.txt"));
+    if (templateLine.empty()) {
+        templateLine = "# HUGGING FACE SALT-OKUNUR TOKENINI BU DOSYANIN ILK SATIRINA YAZIN";
+    }
+    const bool written = std::fwrite(templateLine.data(), 1, templateLine.size(), tokenFile)
+                             == templateLine.size() &&
+                         std::fputc('\n', tokenFile) != EOF &&
+                         std::fflush(tokenFile) == 0;
+    const bool closed = std::fclose(tokenFile) == 0;
+    return written && closed && fileExists(tokenPath);
+}
+
 bool App::initialize(std::string& error) {
     setvbuf(stdout, NULL, _IONBF, 0);
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK) != 0) {
@@ -73,17 +92,10 @@ bool App::initialize(std::string& error) {
 
     // Token hiçbir zaman GitHub'a gerçek değer olarak yazılmaz. Uygulama ilk açılışta
     // PS4 veri klasöründe düzenlenebilir bir şablon oluşturur.
-    const std::string tokenPath = runtimeRoot() + "/hf_token.txt";
-    if (!fileExists(tokenPath)) {
-        FILE* tokenFile = std::fopen(tokenPath.c_str(), "wb");
-        if (tokenFile) {
-            const std::string templateLine = readFirstLine(bundledPath("assets/hf_token.txt"));
-            if (!templateLine.empty()) {
-                std::fwrite(templateLine.data(), 1, templateLine.size(), tokenFile);
-            }
-            std::fputc('\n', tokenFile);
-            std::fclose(tokenFile);
-        }
+    if (!ensureHuggingFaceTokenFile()) {
+        error = "Hugging Face token dosyası oluşturulamadı: " +
+                runtimeRoot() + "/hf_token.txt";
+        return false;
     }
 
     std::string mediaError;
