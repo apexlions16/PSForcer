@@ -4,6 +4,7 @@
 #include <functional>
 #include <stdint.h>
 #include <string>
+#include <vector>
 
 namespace psforcer {
 
@@ -27,6 +28,11 @@ public:
                   const HttpProgressCallback& progress,
                   std::atomic<bool>* cancel,
                   std::string& error);
+    bool resolvePackageHeader(const std::string& url,
+                              uint64_t expectedSize,
+                              std::string& resolvedUrl,
+                              std::vector<uint8_t>& header,
+                              std::string& error);
 private:
     bool initialized_;
 #if defined(PSFORCER_ORBIS)

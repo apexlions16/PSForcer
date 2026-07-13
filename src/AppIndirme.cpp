@@ -37,6 +37,20 @@ void App::startPackageDownload() {
         return;
     }
 
+#if defined(PSFORCER_ORBIS)
+    // Büyük PKG'yi uygulama belleği veya /data üzerinden kopyalama. Yalnızca
+    // küçük PKG başlığı ve imzalı son HTTPS adresi çözülür; asıl indirme ve
+    // kurulum PS4'ün yerel BGFT hizmeti tarafından yürütülür.
+    const InstallOutcome remoteOutcome = installer_->requestRemoteInstall(item, package);
+    if (remoteOutcome.result == InstallResult::InstallStarted) {
+        status_ = "PS4 indiriyor ve kuracak";
+    } else {
+        status_ = "PS4 indirme görevi başlatılamadı";
+    }
+    setToast(remoteOutcome.message, 7500);
+    return;
+#endif
+
     const std::string baseName = sanitizeFileName(item.id + "-" + package.id + "-" + package.version + ".pkg");
     pendingFinalPath_ = runtimeRoot() + "/indirmeler/" + baseName;
     const std::string partialPath = pendingFinalPath_ + ".parca";

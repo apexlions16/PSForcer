@@ -1,10 +1,10 @@
-# PSForcer OpenOrbis paket bilgileri - v0.26
+# PSForcer OpenOrbis paket bilgileri - v0.27
 TITLE       := PSForcer
-VERSION     := 0.26
+VERSION     := 0.27
 TITLE_ID    := PSFC00001
 CONTENT_ID  := IV0000-PSFC00001_00-PSFORCERCLIENT00
 
-LIBS        := -lc -lkernel -lc++ -lSceUserService -lSceVideoOut -lSceAudioOut -lScePad -lSceSysmodule -lSDL2 -lSceNet -lSceSsl -lSceHttp -lSceAppInstUtil
+LIBS        := -lc -lkernel -lc++ -lSceUserService -lSceVideoOut -lSceAudioOut -lScePad -lSceSysmodule -lSDL2 -lSceNet -lSceSsl -lSceHttp -lSceAppInstUtil -lSceBgft
 EXTRAFLAGS  := -std=gnu++11 -D_GNU_SOURCE -DPSFORCER_ORBIS=1
 
 TOOLCHAIN   := $(OO_PS4_TOOLCHAIN)

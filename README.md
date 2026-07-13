@@ -1,6 +1,6 @@
 # PSForcer
 
-PSForcer, OpenOrbis tabanlı bir PlayStation 4 katalog ve indirme istemcisidir. Oyunları konsola uygun bir mağaza görünümünde sunar; ana oyun, güncelleme, ek paket ve ekstra dosyalarını ayırır; katalogda belirtilen bağlantılardan içerik indirir; SHA-256 bütünlüğünü denetler ve tamamlanan dosyayı kurucu uyarlayıcısına teslim eder.
+PSForcer, OpenOrbis tabanlı bir PlayStation 4 katalog ve indirme istemcisidir. Oyunları konsola uygun bir mağaza görünümünde sunar; ana oyun, güncelleme, ek paket ve ekstra dosyalarını ayırır. PS4 derlemesinde PKG bağlantısını konsolun yerel BGFT indirme ve kurulum kuyruğuna teslim eder.
 
 > Bu depo; açık, güvenlik açığı, jailbreak aracı, Sony SDK içeriği, kapalı kaynak çalışma modülü veya platform güvenliğini aşan kod içermez. Yerleşik kurucu uyarlayıcısı, doğrulanmış paketi elle ya da yetkili yöntemle kurulmaya hazır olarak işaretler. Otomatik kurulum yalnızca hedef ortamda meşru biçimde kullanılabilen bir kurucu arayüzüne bağlanabilir.
 
@@ -12,10 +12,10 @@ PSForcer, OpenOrbis tabanlı bir PlayStation 4 katalog ve indirme istemcisidir. 
 - Yerel ve uzak kapak, geniş görsel ve ekran görüntüsü alanları
 - Yalnızca ekranda ihtiyaç duyulan uzak görseller için geçici medya önbelleği
 - Paket içinden yüklenen ve GitHub üzerinden açılışta otomatik yenilenen JSON kataloğu
-- Sürdürülebilir arka plan HTTP(S) indirmeleri
-- Kurucuya teslimden önce SHA-256 bütünlük denetimi
-- PKG tam boyutta kapatıldıktan sonra doğrudan yerel AppInstUtil kurulumuna teslim
-- Yalnızca kurucu başarı bildirdikten sonra çalışan kurulum sonrası silme seçeneği
+- Katalog ve görseller için sürdürülebilir arka plan HTTP(S) indirmeleri
+- PKG başlığı, Content ID, tür ve kesin boyut doğrulaması
+- Büyük PKG'yi `/data` alanına kopyalamadan PS4 BGFT kuyruğunda indirme ve kurulum
+- PS4 sistem bildirimlerinde yerel indirme ilerlemesi
 - Hugging Face herkese açık ve yetkili salt-okunur erişim desteği
 
 ## Denetimler
@@ -71,7 +71,7 @@ Herkese açık Hugging Face dosyaları ek ayar gerektirmez. Bir paket bağlantı
 /data/psforcer/hf_token.txt
 ```
 
-Belirteç GitHub kataloğuna, uygulama paketine, ekran görüntülerine veya hata kayıtlarına eklenmemelidir. PSForcer bu değeri yalnızca `https://huggingface.co/` isteklerinde `Authorization: Bearer` başlığı olarak kullanır. Erişim izni olmayan bir depo bu yöntemle aşılamaz; depo sahibi dosyayı herkese açık yapmalı veya kullanıcıya meşru okuma izni vermelidir.
+Belirteç GitHub kataloğuna, uygulama paketine, ekran görüntülerine veya hata kayıtlarına eklenmemelidir. PSForcer bu değeri yalnızca `https://huggingface.co/` üzerindeki küçük PKG başlığı isteğinde, indirme için gereken süreli ve imzalı son bağlantıyı çözmek amacıyla kullanır. Token PS4 BGFT görevine veya günlüklere yazılmaz. Erişim izni olmayan bir depo bu yöntemle aşılamaz; depo sahibi dosyayı herkese açık yapmalı veya kullanıcıya meşru okuma izni vermelidir.
 
 Bu dosya FTP ile silinirse PSForcer bir sonraki açılışta veya paket indirmesi
 başlatılırken güvenli açıklama şablonunu yeniden oluşturur. Gerçek token yalnızca
@@ -90,12 +90,16 @@ python3 tools/validate_catalog.py assets/catalog.json
 
 ## İndirme ve kurulum sırası
 
-Paket önce `/data/psforcer/indirmeler/*.pkg.parca` dosyasına yazılır. Katalogdaki
-kesin bayt boyutu (ve varsa SHA-256) doğrulanmadan dosya tamamlanmış sayılmaz.
-Doğrulama başarılı olduğunda dosya kapatılır, `.pkg` adına çevrilir ve ancak
-bundan sonra PS4'ün yerel PKG kurucusuna teslim edilir. Kurulum aşaması aynı
-dosya üzerinde ikinci bir ağ indirmesi başlatmaz.
+PS4 üzerinde Kare düğmesine basıldığında PSForcer uzak dosyanın yalnızca ilk
+1080 baytlık PKG başlığını okur. Katalogdaki kesin boyut, başlıktaki gerçek boyut,
+Content ID ve paket türü doğrulanır. Hugging Face kullanılıyorsa token ile süreli
+imzalı son indirme adresi çözülür. Bu adres PS4'ün BGFT hizmetine verilir; büyük
+PKG doğrudan konsolun sistem indirme alanına iner ve tamamlanınca PS4 tarafından
+kurulur. `/data/psforcer/indirmeler` altında ikinci bir PKG kopyası oluşturulmaz.
+
+Bilgisayar test derlemesindeki yerel dosya yolu, indirme yöneticisi sınamalarını
+korumak için ayrı tutulur; PS4 sürümü bu yolu kullanmaz.
 
 ## Proje durumu
 
-Bu sürümde P.T. kapak, header ve ekran görüntüleri paket içinde bulunduğu için dış görsel sunucularına bağlı değildir. Diğer katalog kayıtları yerel veya uzak medya bağlantıları kullanabilir. Video alanı veri modelinde bulunur ancak oynatıcı henüz bağlı değildir. Paket indirme, devam ettirme, beklenen boyut denetimi, yetkili Hugging Face erişimi ve isteğe bağlı SHA-256 bütünlük denetimi çalışır; kurulum işlemi açıkça ayrılmış kurucu arayüzünün arkasındadır. Yeni oyunlar `catalog/katalog.json` güncellenerek eklenir ve uygulama kodu değişmediği sürece yeni PSForcer PKG sürümü gerektirmez.
+Bu sürümde P.T. kapak, header ve ekran görüntüleri paket içinde bulunduğu için dış görsel sunucularına bağlı değildir. Diğer katalog kayıtları yerel veya uzak medya bağlantıları kullanabilir. Video alanı veri modelinde bulunur ancak oynatıcı henüz bağlı değildir. PS4 PKG indirme ve kurulumu BGFT hizmetine devredilir; uygulama yalnızca uzak başlığı ve erişim bağlantısını doğrular. Yeni oyunlar `catalog/katalog.json` güncellenerek eklenir ve uygulama kodu değişmediği sürece yeni PSForcer PKG sürümü gerektirmez.
