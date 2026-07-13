@@ -30,7 +30,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  YAYIN_ETIKETI: v0.2.7
+  YAYIN_ETIKETI: v0.2.8
   PAKET_ADI: IV0000-PSFC00001_00-PSFORCERCLIENT00.pkg
 
 jobs:
@@ -152,8 +152,8 @@ jobs:
           if ! gh release view "$YAYIN_ETIKETI" >/dev/null 2>&1; then
             gh release create "$YAYIN_ETIKETI" \
               --target "$GITHUB_SHA" \
-              --title 'PSForcer v0.2.7 PS4 Doğrudan İndirme ve Kurulum' \
-              --notes 'Büyük PKG artık PSForcer tarafından /data alanına indirilmez. Uygulama yalnızca PKG başlığını ve Hugging Face imzalı son bağlantısını çözer; indirme ile kurulum PS4 sisteminin yerel BGFT kuyruğunda yürür ve konsolun indirme bildirimlerinde görünür. Katalog boyutu ile PKG başlığındaki gerçek boyut eşleşmeden görev oluşturulmaz. hf_token.txt silinirse güvenli şablon yeniden oluşturulur; gerçek token yayına eklenmez. Önceki GitHub yayınları artık yeni sürüm oluşturulurken silinmez.'
+              --title 'PSForcer v0.2.8 BGFT Çökme Düzeltmesi' \
+              --notes 'İndirme düğmesine basıldığında oluşan uygulama çökmesi düzeltildi. PS4 BGFT ve UserService fonksiyonları çağrılmadan önce gerekli çalışma zamanı sistem modülleri artık açıkça yükleniyor. Büyük PKG yine doğrudan PS4 sistem kuyruğuna indirilip kuruluyor; /data alanında ikinci kopya oluşturulmuyor. Olası cihaz-özel sorunlarda son güvenli aşamayı göstermek için /data/psforcer/bgft_tani.log tanı kaydı eklendi. hf_token.txt güvenli otomatik yeniden oluşturma davranışı korunuyor.'
           fi
           gh release upload "$YAYIN_ETIKETI" \
             "$PAKET_ADI" "$PAKET_ADI.sha256" \

@@ -97,6 +97,14 @@ imzalı son indirme adresi çözülür. Bu adres PS4'ün BGFT hizmetine verilir;
 PKG doğrudan konsolun sistem indirme alanına iner ve tamamlanınca PS4 tarafından
 kurulur. `/data/psforcer/indirmeler` altında ikinci bir PKG kopyası oluşturulmaz.
 
+PSForcer, BGFT ve UserService işlevlerini çağırmadan önce gerekli PS4 çalışma
+zamanı sistem modüllerini açıkça yükler. Görev oluşturma yine tamamlanamazsa son
+güvenli aşama aşağıdaki dosyada tutulur; bağlantı veya token değeri kayda yazılmaz:
+
+```text
+/data/psforcer/bgft_tani.log
+```
+
 Bilgisayar test derlemesindeki yerel dosya yolu, indirme yöneticisi sınamalarını
 korumak için ayrı tutulur; PS4 sürümü bu yolu kullanmaz.
 
