@@ -33,7 +33,7 @@ std::string orbisError(const char* operation, int32_t result) {
 void resetBgftDiagnostic() {
     FILE* file = std::fopen("/data/psforcer/bgft_tani.log", "wb");
     if (!file) return;
-    std::fprintf(file, "surum=0.2.10 asama=istek_alindi\n");
+    std::fprintf(file, "surum=0.2.11 asama=istek_alindi\n");
     std::fflush(file);
     std::fclose(file);
 }
@@ -341,9 +341,10 @@ InstallOutcome OrbisInstaller::requestRemoteInstall(const CatalogItem& item,
 
     OrbisBgftTaskId taskId = -1;
     appendBgftDiagnostic("gorev_kaydi_basliyor");
-    // GameBaTo'nun PS4 sistem indiricisi yolu, hem ana paket hem yama için
-    // DebugDownloadRegisterPkg ile kayıt yapıp görevi IntDownloadStartTask ile
-    // başlatıyor. Bu ikili aynı BGFT istemci oturumunda kullanılmalıdır.
+    // GameBaTo'dan alınan kayıt yolu hem ana paket hem yama için korunur.
+    // Görevi genel DownloadStartTask API'siyle başlatmak önemlidir: dahili
+    // IntDownloadStartTask sembolünü eboot'a bağlamak bazı PS4 yazılımlarında
+    // main() çalışmadan CE-34878-0 ile yükleyici çökmesine neden olur.
     result = sceBgftServiceIntDebugDownloadRegisterPkg(&params, &taskId);
     appendBgftDiagnostic("gorev_kaydi_tamam", result);
     if (result != 0) {
@@ -352,7 +353,7 @@ InstallOutcome OrbisInstaller::requestRemoteInstall(const CatalogItem& item,
     }
 
     appendBgftDiagnostic("gorev_baslatiliyor");
-    result = sceBgftServiceIntDownloadStartTask(taskId);
+    result = sceBgftServiceDownloadStartTask(taskId);
     appendBgftDiagnostic("gorev_baslatma_tamam", result);
     if (result != 0) {
         sceBgftServiceIntDownloadUnregisterTask(taskId);
