@@ -28,11 +28,88 @@ if marker not in text:
     )
     text = replace_once(text, anchor, anchor + insertion, "PS4 okuma döngüsü")
 
+# Uzun paket aktarımında bağlantının açık kalmasına güvenme. Her HTTP yanıtı
+# tamamlandığında soket kapansın; yeniden bağlantı gerekiyorsa istemci kesin
+# dosya ofsetinden yeni bir aralık isteği açar.
+text = text.replace(
+    '            sceHttpAddRequestHeader(requestId, "Connection", "keep-alive", 0);',
+    '            sceHttpAddRequestHeader(requestId, "Connection", "close", 0);',
+    1,
+)
+
+# Kaldığı yerden devam isteğini dosyanın katalogdaki son baytıyla sınırla.
+# Sunucu daha büyük bir nesne barındırsa bile istek hedef PKG dışına taşamaz.
+if 'range << (expectedSize - 1);' not in text:
+    text = replace_once(
+        text,
+        '                range << "bytes=" << requestStart << \'-\';',
+        '                range << "bytes=" << requestStart << \'-\';\n'
+        '                if (expectedSize > 0) range << (expectedSize - 1);',
+        "sınırlı Range başlığı",
+    )
+
+# Hugging Face yetkilendirme hatasını doğrudan token dosyasına bağla.
+if "/data/psforcer/hf_token.txt" not in text[text.find("if (statusCode != 200"):]:
+    text = replace_once(
+        text,
+        '        if (statusCode != 200 && statusCode != 206) {\n'
+        '            std::ostringstream message;\n'
+        '            message << "İndirme isteği başarısız oldu; durum kodu: " << statusCode;\n'
+        '            error = message.str();\n'
+        '            closeRequestObjects(requestId, connectionId);\n'
+        '            sceHttpDeleteTemplate(templateId);\n'
+        '            break;\n'
+        '        }',
+        '        if (statusCode != 200 && statusCode != 206) {\n'
+        '            std::ostringstream message;\n'
+        '            if (statusCode == 401 && isHuggingFaceUrl(currentUrl)) {\n'
+        '                message << "Hugging Face erişimi reddedildi. Tokenı "\n'
+        '                        << "/data/psforcer/hf_token.txt dosyasının ilk satırına yazın";\n'
+        '            } else {\n'
+        '                message << "İndirme isteği başarısız oldu; durum kodu: " << statusCode;\n'
+        '            }\n'
+        '            error = message.str();\n'
+        '            closeRequestObjects(requestId, connectionId);\n'
+        '            sceHttpDeleteTemplate(templateId);\n'
+        '            break;\n'
+        '        }',
+        "Hugging Face 401 açıklaması",
+    )
+
+# Sunucu başlıkları katalogdaki kesin boyutla uyuşmuyorsa veri yazmaya başlamadan
+# dur. Böylece yanlış bağlantı, HTML hata gövdesi veya farklı bir PKG diski
+# dolduramaz.
+size_guard_marker = "Sunucu dosya boyutu katalogla uyuşmuyor"
+if size_guard_marker not in text:
+    anchor = "        if (expectedSize > 0) total = expectedSize;\n\n"
+    insertion = (
+        "        if (expectedSize > 0) {\n"
+        "            bool sizeMismatch = false;\n"
+        "            uint64_t reportedSize = 0;\n"
+        "            if (contentRange.valid && contentRange.total > 0) {\n"
+        "                reportedSize = contentRange.total;\n"
+        "                sizeMismatch = reportedSize != expectedSize;\n"
+        "            } else if (!rangeRequested && expectedResponseBytes > 0) {\n"
+        "                reportedSize = expectedResponseBytes;\n"
+        "                sizeMismatch = reportedSize != expectedSize;\n"
+        "            }\n"
+        "            if (sizeMismatch) {\n"
+        "                std::ostringstream message;\n"
+        "                message << \"Sunucu dosya boyutu katalogla uyuşmuyor. Beklenen \"\n"
+        "                        << expectedSize << \" bayt, bildirilen \" << reportedSize;\n"
+        "                error = message.str();\n"
+        "                closeRequestObjects(requestId, connectionId);\n"
+        "                sceHttpDeleteTemplate(templateId);\n"
+        "                break;\n"
+        "            }\n"
+        "        }\n\n"
+    )
+    text = replace_once(text, anchor, anchor + insertion, "sunucu boyut doğrulaması")
+
 # sceHttpReadData bazı PS4 ortamlarında istenen tamponun tamamı dolana veya
 # bağlantı kapanana kadar bekleyebiliyor. Son parça 512 KiB'den küçük olduğunda
-# dosya ağdan tamamen gelmiş görünse bile keep-alive bağlantısı indirme işçisini
-# içeride tutuyordu. Her çağrıyı dosyada ve HTTP yanıtında kalan kesin baytla
-# sınırlandır; böylece son çağrı tam kalan uzunluğu ister ve EOF beklemez.
+# dosya ağdan tamamen gelmiş görünse bile bağlantı indirme işçisini içeride
+# tutuyordu. Her çağrıyı dosyada ve HTTP yanıtında kalan kesin baytla sınırla.
 if "uint64_t readCapacity = buffer.size();" not in text:
     text = replace_once(
         text,
@@ -100,4 +177,4 @@ if "if (read < wanted) break;" not in text:
     )
 
 path.write_text(text)
-print("HTTP kesin tamamlama yaması uygulandı")
+print("HTTP kesin boyut, temiz bağlantı ve tamamlama yaması uygulandı")
