@@ -33,7 +33,7 @@ std::string orbisError(const char* operation, int32_t result) {
 void resetBgftDiagnostic() {
     FILE* file = std::fopen("/data/psforcer/bgft_tani.log", "wb");
     if (!file) return;
-    std::fprintf(file, "surum=0.29 asama=istek_alindi\n");
+    std::fprintf(file, "surum=0.2.10 asama=istek_alindi\n");
     std::fflush(file);
     std::fclose(file);
 }
@@ -208,6 +208,10 @@ InstallOutcome OrbisInstaller::requestRemoteInstall(const CatalogItem& item,
              "system_service_modulu", "SystemService"},
             {ORBIS_SYSMODULE_INTERNAL_USER_SERVICE,
              "user_service_modulu", "UserService"},
+            {ORBIS_SYSMODULE_INTERNAL_NETCTL, "netctl_modulu", "NetCtl"},
+            {ORBIS_SYSMODULE_INTERNAL_NET, "net_modulu", "Net"},
+            {ORBIS_SYSMODULE_INTERNAL_SSL, "ssl_modulu", "SSL"},
+            {ORBIS_SYSMODULE_INTERNAL_HTTP, "http_modulu", "HTTP"},
             {ORBIS_SYSMODULE_INTERNAL_APP_INST_UTIL,
              "app_inst_util_modulu", "AppInstUtil"},
             {ORBIS_SYSMODULE_INTERNAL_BGFT, "bgft_modulu", "BGFT"},
@@ -229,10 +233,12 @@ InstallOutcome OrbisInstaller::requestRemoteInstall(const CatalogItem& item,
 
     // BGFT istemci oturumu yalnızca modülleri yüklemekle oluşmaz. Sony'nin
     // başlatma sırasına uygun olarak kullanıcı ve paket kurulum hizmetlerini
-    // BGFT'den önce bir kez başlat.
+    // BGFT'den önce bir kez başlat. GameBaTo, UserService için varsayılan NULL
+    // yerine 0x100 öncelik parametresi kullanıyor; aynı çağrı biçimini koru.
     if (!userServiceInitialized_) {
         appendBgftDiagnostic("user_service_init_basliyor");
-        const int32_t result = sceUserServiceInitialize(NULL);
+        int32_t userServicePriority = 0x100;
+        const int32_t result = sceUserServiceInitialize(&userServicePriority);
         appendBgftDiagnostic("user_service_init_tamam", result);
         if (result != 0) {
             return InstallOutcome(InstallResult::Failed,
@@ -335,9 +341,10 @@ InstallOutcome OrbisInstaller::requestRemoteInstall(const CatalogItem& item,
 
     OrbisBgftTaskId taskId = -1;
     appendBgftDiagnostic("gorev_kaydi_basliyor");
-    result = header.patch
-        ? sceBgftServiceIntDebugDownloadRegisterPkg(&params, &taskId)
-        : sceBgftServiceIntDownloadRegisterTask(&params, &taskId);
+    // GameBaTo'nun PS4 sistem indiricisi yolu, hem ana paket hem yama için
+    // DebugDownloadRegisterPkg ile kayıt yapıp görevi IntDownloadStartTask ile
+    // başlatıyor. Bu ikili aynı BGFT istemci oturumunda kullanılmalıdır.
+    result = sceBgftServiceIntDebugDownloadRegisterPkg(&params, &taskId);
     appendBgftDiagnostic("gorev_kaydi_tamam", result);
     if (result != 0) {
         return InstallOutcome(InstallResult::Failed,
@@ -345,7 +352,7 @@ InstallOutcome OrbisInstaller::requestRemoteInstall(const CatalogItem& item,
     }
 
     appendBgftDiagnostic("gorev_baslatiliyor");
-    result = sceBgftServiceDownloadStartTask(taskId);
+    result = sceBgftServiceIntDownloadStartTask(taskId);
     appendBgftDiagnostic("gorev_baslatma_tamam", result);
     if (result != 0) {
         sceBgftServiceIntDownloadUnregisterTask(taskId);

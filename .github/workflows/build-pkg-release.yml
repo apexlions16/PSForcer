@@ -30,7 +30,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  YAYIN_ETIKETI: v0.2.9
+  YAYIN_ETIKETI: v0.2.10
   PAKET_ADI: IV0000-PSFC00001_00-PSFORCERCLIENT00.pkg
 
 jobs:
@@ -152,8 +152,8 @@ jobs:
           if ! gh release view "$YAYIN_ETIKETI" >/dev/null 2>&1; then
             gh release create "$YAYIN_ETIKETI" \
               --target "$GITHUB_SHA" \
-              --title 'PSForcer v0.2.9 BGFT Oturum Başlatma Düzeltmesi' \
-              --notes '0x80990050 SCE_BGFT_ERROR_FATAL hatası için PS4 hizmet başlatma ve SELF yetki bilgisi düzeltildi. Gerekli SysCore, SystemService, UserService, AppInstUtil, BGFT ve NpCommon modülleri yükleniyor; ardından UserService ve AppInstUtil istemcileri BGFT hizmetinden önce başlatılıyor. FSELF artık referans Remote Package Installer ile aynı BGFT yetenek bilgisini taşıyor. Büyük PKG doğrudan PS4 sistem kuyruğuna indirilip kurulmaya devam eder ve /data alanında ikinci kopya oluşturulmaz. bgft_tani.log aşama kaydı korunur.'
+              --title 'PSForcer v0.2.10 GameBaTo BGFT Yöntemi' \
+              --notes 'Gönderilen GameBaTo PKG dosyasının eboot çağrı akışı incelendi ve PS4 sistem indiricisi yöntemi PSForcer uygulamasına uyarlandı. NetCtl, Net, SSL ve HTTP modülleri BGFT oturumundan önce yükleniyor; UserService GameBaTo ile aynı 0x100 başlatma parametresini kullanıyor. Uzak ana paketler ve yamalar DebugDownloadRegisterPkg ile kaydedilip IntDownloadStartTask ile başlatılıyor. PKG doğrudan PS4 indirme ve kurulum kuyruğuna gider; /data altında ikinci kopya oluşturulmaz. SELF yetenek bilgisi ve bgft_tani.log tanısı korunur.'
           fi
           gh release upload "$YAYIN_ETIKETI" \
             "$PAKET_ADI" "$PAKET_ADI.sha256" \
