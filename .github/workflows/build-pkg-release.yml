@@ -32,8 +32,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  YAYIN_ETIKETI: v0.2.4
-  ESKI_YAYIN_ETIKETI: v0.2.3
+  YAYIN_ETIKETI: v0.2.5
+  ESKI_YAYIN_ETIKETI: v0.2.4
   PAKET_ADI: IV0000-PSFC00001_00-PSFORCERCLIENT00.pkg
 
 jobs:
@@ -165,8 +165,8 @@ jobs:
           if ! gh release view "$YAYIN_ETIKETI" >/dev/null 2>&1; then
             gh release create "$YAYIN_ETIKETI" \
               --target "$GITHUB_SHA" \
-              --title 'PSForcer v0.2.4 Son HTTP Parçası Düzeltmesi' \
-              --notes 'Son HTTP parçası 512 KiB tamponundan küçük olduğunda PS4 HTTP katmanının keep-alive bağlantısının kapanmasını beklemesi engellendi. Okuma çağrısı artık katalogda ve HTTP yanıtında kalan kesin bayt sayısıyla sınırlandırılıyor; dosya tamamen indiğinde indirme doğrudan tamamlanıyor. OpenOrbis paket derlemesi ve indirme yöneticisi regresyon testleri başarıyla doğrulandı.'
+              --title 'PSForcer v0.2.5 Temiz İndirme ve Otomatik Kurulum' \
+              --notes 'Her paket indirmesi eski .parca dosyasını silerek sıfırdan başlar ve katalogda kesin boyut bulunmadığında güvenli biçimde reddedilir. HTTP Range isteği hedef PKG son baytıyla sınırlandırılır, sunucunun bildirdiği boyut katalogla karşılaştırılır ve bağlantı her yanıt sonunda kapatılır. Doğrulanan PKG artık PS4 BGFT hizmetine otomatik kurulum görevi olarak teslim edilir. Hugging Face 401 hataları token dosyasının tam yolunu gösterir.'
           fi
           gh release upload "$YAYIN_ETIKETI" \
             "$PAKET_ADI" "$PAKET_ADI.sha256" \
