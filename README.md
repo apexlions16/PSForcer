@@ -101,8 +101,10 @@ PSForcer, gerekli PS4 çalışma zamanı sistem modüllerini açıkça yükler; 
 UserService ve AppInstUtil istemcilerini BGFT hizmetinden önce başlatır. Uygulama
 FSELF'i, BGFT istemcisinin gerektirdiği yetenek bilgisini de taşır.
 
-v0.2.12 kurtarma paketi, PS4'te açıldığı doğrulanan v0.2.9 eboot'unu
-byte-byte yeniden üretir. Ana paketler `sceBgftServiceIntDownloadRegisterTask`,
+v0.2.13 güvenli kurulum paketi, PS4'te açıldığı doğrulanan v0.2.9 eboot'unu
+byte-byte yeniden üretir ve eski kurulum durumundan ayrılmak için `PSFC00002`
+kimliğiyle bağımsız **PSForcer Safe** uygulaması olarak kurulur. Ana paketler
+`sceBgftServiceIntDownloadRegisterTask`,
 yamalar `sceBgftServiceIntDebugDownloadRegisterPkg` ile kaydedilir ve görev
 `sceBgftServiceDownloadStartTask` ile başlatılır. GitHub Actions, yayın öncesi
 eboot SHA-256 değerini bilinen çalışan dosyayla karşılaştırır.

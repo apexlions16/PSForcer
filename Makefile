@@ -1,8 +1,8 @@
-# PSForcer OpenOrbis paket bilgileri - v0.32
-TITLE       := PSForcer
-VERSION     := 0.32
-TITLE_ID    := PSFC00001
-CONTENT_ID  := IV0000-PSFC00001_00-PSFORCERCLIENT00
+# PSForcer OpenOrbis güvenli kurulum paketi - v0.33
+TITLE       := PSForcer Safe
+VERSION     := 0.33
+TITLE_ID    := PSFC00002
+CONTENT_ID  := IV0000-PSFC00002_00-PSFORCERCLIENT00
 
 # BGFT istemci oturumu için Remote Package Installer ile aynı SELF yetki
 # yetenekleri. create-fself ilk 8 baytı atıp PAID değerini ayrıca yazar.

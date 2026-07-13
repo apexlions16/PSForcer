@@ -30,8 +30,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  YAYIN_ETIKETI: v0.2.12
-  PAKET_ADI: IV0000-PSFC00001_00-PSFORCERCLIENT00.pkg
+  YAYIN_ETIKETI: v0.2.13
+  PAKET_ADI: IV0000-PSFC00002_00-PSFORCERCLIENT00.pkg
 
 jobs:
   paket-derleme:
@@ -154,8 +154,8 @@ jobs:
           if ! gh release view "$YAYIN_ETIKETI" >/dev/null 2>&1; then
             gh release create "$YAYIN_ETIKETI" \
               --target "$GITHUB_SHA" \
-              --title 'PSForcer v0.2.12 Açılış Kurtarma Sürümü' \
-              --notes 'v0.2.10 ve v0.2.11 paketlerinde görülen açılış CE-34878-0 hatası için eboot, PS4 üzerinde açıldığı doğrulanan v0.2.9 kaynak akışına tamamen geri döndürüldü. CI, oluşturulan eboot.bin dosyasını bilinen çalışan v0.2.9 SHA-256 değeriyle byte-byte doğrulamadan yayın yapmaz. Paket sürümü 0.32 olarak yükseltilmiştir; kullanıcı verileri ve hf_token.txt korunur.'
+              --title 'PSForcer v0.2.13 Bağımsız Güvenli Kurulum' \
+              --notes 'Aynı TITLE_ID altındaki eski kurulum ve uygulama durumunu tamamen devre dışı bırakmak için bu sürüm PSFC00002 kimliğiyle PSForcer Safe adlı ayrı bir uygulama olarak kurulur. eboot.bin, PS4 üzerinde açıldığı doğrulanan v0.2.9 dosyasıyla byte-byte aynıdır ve CI SHA-256 kilidiyle doğrulanır. Önceki PSForcer kurulumunun üzerine yazılmaz; iki uygulama ayrı simgeler olarak görünür. /data/psforcer altındaki hf_token.txt korunur.'
           fi
           gh release upload "$YAYIN_ETIKETI" \
             "$PAKET_ADI" "$PAKET_ADI.sha256" \
