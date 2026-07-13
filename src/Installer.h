@@ -8,6 +8,7 @@ namespace psforcer {
 
 enum class InstallResult {
     Installed,
+    InstallStarted,
     ReadyForManualInstall,
     Failed
 };
@@ -32,6 +33,19 @@ public:
     virtual InstallOutcome requestInstall(const CatalogItem& item,
                                           const PackageInfo& package,
                                           const std::string& packagePath);
+};
+
+class OrbisInstaller : public Installer {
+public:
+    OrbisInstaller();
+    virtual ~OrbisInstaller();
+    virtual InstallOutcome requestInstall(const CatalogItem& item,
+                                          const PackageInfo& package,
+                                          const std::string& packagePath);
+private:
+    void* bgftHeap_;
+    bool bgftInitialized_;
+    bool appInstInitialized_;
 };
 
 }  // namespace psforcer
