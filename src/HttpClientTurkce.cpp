@@ -318,7 +318,7 @@ bool HttpClient::download(const std::string& url,
         int connectionId = 0;
         int requestId = 0;
 
-        templateId = sceHttpCreateTemplate(httpContextId_, "PSForcer/0.2.11",
+        templateId = sceHttpCreateTemplate(httpContextId_, "PSForcer/0.29",
                                            ORBIS_HTTP_VERSION_1_1, 1);
         if (templateId < 0) {
             error = PSF_SABLON;
@@ -704,7 +704,7 @@ bool HttpClient::resolvePackageHeader(const std::string& url,
     int redirectCount = 0;
 
     while (true) {
-        int templateId = sceHttpCreateTemplate(httpContextId_, "PSForcer/0.2.11",
+        int templateId = sceHttpCreateTemplate(httpContextId_, "PSForcer/0.29",
                                                ORBIS_HTTP_VERSION_1_1, 1);
         if (templateId < 0) {
             error = PSF_SABLON;
